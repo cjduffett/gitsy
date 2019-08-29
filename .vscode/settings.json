@@ -1,0 +1,35 @@
+{
+    // Don't show these items in the file tree
+    "files.exclude": {
+        "*.egg-info": true,
+        "**/__pycache__": true,
+        "**/.mypy_cache": true
+    },
+    // Format files with black
+    "python.formatting.blackArgs": ["-v", "--line-length", "99", "--py36"],
+    "python.formatting.blackPath": "${workspaceFolder}/.venv/bin/black",
+    "python.formatting.provider": "black",
+    // Lint files with pylint and mypy
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": false,
+    "python.linting.mypyEnabled": true,
+    "python.linting.mypyPath": "${workspaceFolder}/.venv/bin/mypy",
+    "python.linting.pylintEnabled": true,
+    "python.linting.pylintPath": "${workspaceFolder}/.venv/bin/pylint",
+    "python.linting.pylintArgs": ["--rcfile=./.pylintrc"],
+    "python.pythonPath": "${workspaceFolder}/.venv/bin/python3",
+    // VSCode wont trigger this automatically, but we can run it manually
+    "python.sortImports.path": "${workspaceFolder}/.venv/bin/isort",
+    // Don't nag us about running tests via the VSCode UI
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    "python.testing.promptToConfigure": false,
+    "[python]": {
+        "editor.formatOnSave": true,
+        // Sometimes black takes a little longer than we'd like to format large files
+        "editor.formatOnSaveTimeout": 1500,
+        // Organize imports on save using isort
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        }
+    }
+}
