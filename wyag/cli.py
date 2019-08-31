@@ -4,13 +4,13 @@ import click
 
 
 @click.group()
-@click.pass_context
-def wyag(context):
+def wyag():
     """The stupid content tracker."""
 
 
 @click.command()
 def version():
+    """Print this project's version and exit."""
     with open(".version") as f:
         print(f.readline())
 
