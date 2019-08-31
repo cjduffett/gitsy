@@ -1,11 +1,16 @@
 """Wyag CLI entrypoint and commands."""
 
+import sys
+
 import click
+
+from . import services
 
 
 @click.group()
 def wyag():
     """The stupid content tracker."""
+    sys.tracebacklimit = 0  # Disable error tracebacks
 
 
 @click.command()
@@ -16,9 +21,11 @@ def version():
 
 
 @click.command()
-def init():
-    """Initialize a wyag repository."""
-    print("New repo install in .wyag")
+@click.argument("path", default=".")
+def init(path):
+    """Initialize a new, empty repository."""
+
+    services.init_repo(path)
 
 
 # Add all of the subcommands to the main group
