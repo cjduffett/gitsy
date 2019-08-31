@@ -5,7 +5,7 @@ from .models import Repository
 
 def init_repo(path: str) -> Repository:
     """Create a new Git repository.
-    
+
     To create a new repository the worktree directory must not exist, or must be empty.
     """
 

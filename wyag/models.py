@@ -54,7 +54,7 @@ class Repository:
 
     def repo_file(self, file_name: Union[Path, str], touch: bool = False) -> Path:
         """Returns a Path to the named file within the repository.
-        
+
         If `touch` = True creates an empty file if it does not exist.
         """
 
@@ -71,7 +71,7 @@ class Repository:
 
     def repo_dir(self, dir_name: Union[Path, str], mkdir: bool = False) -> Path:
         """Returns a Path to the named directory within the repository.
-        
+
         If `mkdir` = True creates the Path if it does not exist.
         """
 
