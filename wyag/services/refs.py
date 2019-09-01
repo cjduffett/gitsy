@@ -28,18 +28,23 @@ def list_refs(repo: Repository, path: Optional[Union[Path, str]] = None) -> Refe
 
     # Collect refs in sorted order
     for item_path in sorted(ref_dir.iterdir(), key=str):
+
         ref_path = ref_dir / item_path
 
         if ref_path.is_dir():
+            # If the reference is a directory, recursively resolve all of the reference
+            # files in that directory.
             refs_in_dir = list_refs(repo, path=ref_path)
             refs.update(refs_in_dir)
         else:
-            refs[str(ref_path)] = resolve_ref(repo, ref=ref_path)
+            # If the reference is a file, read the reference and resolve it to its full SHA-1 hash.
+            ref = str(ref_path)
+            refs[ref] = resolve_ref(repo, ref=ref)
 
     return refs
 
 
-def resolve_ref(repo: Repository, ref: Union[Path, str]) -> str:
+def resolve_ref(repo: Repository, ref: str) -> str:
     """Resolve an Object reference to a full SHA-1 hash."""
 
     ref_file = repo.repo_file(ref)
@@ -48,12 +53,12 @@ def resolve_ref(repo: Repository, ref: Union[Path, str]) -> str:
         data = f.read()[:-1]  # Drop final newline
 
     if data.startswith(b"ref: "):
-        return resolve_ref(repo, data[5:])
+        return resolve_ref(repo, data[5:])  # Indirect reference
 
-    return data
+    return data  # Direct reference to an Object hash
 
 
-def show_refs(repo: Repository, refs: References, show_hash: bool = True):
+def show_refs(refs: References, show_hash: bool = True):
     """List references."""
 
     for ref, sha in refs.items():
