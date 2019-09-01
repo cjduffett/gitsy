@@ -91,7 +91,7 @@ def ls_tree(tree_sha):
     "-t",
     "--type",
     "obj_type",
-    choices=click.Choice(OBJECT_TYPE_CHOICES),
+    type=click.Choice(OBJECT_TYPE_CHOICES),
     default=None,
     help="The expected object type.",
 )
@@ -151,6 +151,7 @@ wyag.add_command(hash_object)
 wyag.add_command(init)
 wyag.add_command(log)
 wyag.add_command(ls_tree)
+wyag.add_command(rev_parse)
 wyag.add_command(show_ref)
 wyag.add_command(tag)
 wyag.add_command(version)
