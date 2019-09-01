@@ -110,7 +110,9 @@ def _log_commit(commit: objects.Commit, commit_sha: str) -> None:
     print(f"\n\t{str(commit.message.text)}")
 
 
-def resolve_sha(repo: Repository, name: str, obj_type: str, follow: bool = True) -> str:
+def resolve_sha(
+    repo: Repository, name: str, obj_type: Optional[str] = None, follow: bool = True
+) -> str:
     """Resolves the name of a Git Object to its full SHA-1 hash."""
     return name  # TODO: implement name resolution
 

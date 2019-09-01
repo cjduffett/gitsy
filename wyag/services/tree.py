@@ -1,42 +1,59 @@
 """Git tree manipulation services."""
 
-from typing import List, Tuple, cast
+from pathlib import Path
+from typing import Union, cast
 
-from ..models.objects import Tree, TreeNode
+from ..models import objects
 from ..models.repo import Repository
-from .objects import read_object
+from .objects import read_object, resolve_sha
 
 
-def read_nodes(data: bytes) -> List[TreeNode]:
-    """Read a Git Tree's nodes."""
+def checkout(repo: Repository, sha: str, path: str = "."):
+    """Checkout the specified Commit or Tree."""
 
-    index: int = 0
-    nodes: List[TreeNode] = list()
+    full_sha = resolve_sha(repo, name=sha)
+    obj = read_object(repo, full_sha)
 
-    while index < len(data):
-        index, node = _parse_node(data, start=index)
-        nodes.append(node)
+    # If the specified object is a Commit, grab its Tree
+    if obj.type_ == "commit":
+        commit = cast(objects.Commit, obj)
+        obj = read_object(repo, commit.tree_sha, obj_type="tree")
 
-    return nodes
+    # Verify that path is an empty directory
+    checkout_path = Path(path)
+
+    if checkout_path.exists():
+        if not checkout_path.is_dir():
+            raise Exception(f"{checkout_path} is not a directory!")
+        if list(checkout_path.iterdir()):
+            raise Exception(f"Directory {checkout_path} is not empty!")
+    else:
+        checkout_path.mkdir(parents=True)
 
 
-def write_nodes(nodes: List[TreeNode]) -> bytes:
-    """Write a Git Tree's nodes to bytes."""
+def _checkout_tree(repo: Repository, tree: objects.Tree, path: Union[Path, str]):
+    """Checkout the given Tree."""
 
-    data = b""
+    for node in tree.nodes:
+        node_obj = read_object(repo, node.sha)
+        dest = Path(path) / str(node.path, encoding="ascii")
 
-    for node in nodes:
-        data += node.mode
-        data += b" " + node.path
-        data += b"\x00" + int(node.sha, 16).to_bytes(20, byteorder="big")
+        if node_obj.type_ == "tree":
+            dest.mkdir(parents=True)
+            tree_obj = cast(objects.Tree, node_obj)
+            _checkout_tree(repo, tree_obj, path)
 
-    return data
+        if node_obj.type_ == "blob":
+            blob_obj = cast(objects.Blob, node_obj)
+
+            with dest.open("wb") as f:
+                f.write(blob_obj.blob_data)
 
 
 def ls_tree(repo: Repository, tree_sha: str) -> None:
     """Print the specified Tree."""
 
-    tree = cast(Tree, read_object(repo, tree_sha, obj_type="tree"))
+    tree = cast(objects.Tree, read_object(repo, tree_sha, obj_type="tree"))
 
     for node in tree.nodes:
         # Left pad with zeros to always display a 6-digit file mode
@@ -46,30 +63,3 @@ def ls_tree(repo: Repository, tree_sha: str) -> None:
         node_obj = read_object(repo, node.sha)
 
         print(f"{display_mode} {node_obj.type_} {node.sha} {node.path.decode('ascii')}")
-
-
-def _parse_node(data: bytes, start: int = 0) -> Tuple[int, TreeNode]:
-    """Parse a Node of a Git Tree.
-
-    Format: `[mode] space [path] 0x00 [sha-1]`
-    """
-
-    # Find the space terminator of the node
-    space_index = data.find(b" ", start)
-
-    # Read the mode
-    mode = data[start:space_index]
-
-    # Find the null terminator after the space
-    null_index = data.find(b"\x00", space_index)
-
-    # Read the path
-    path = data[space_index + 1 : null_index]
-
-    # Read the SHA and convert from 20 bytes binary to the hex string
-    sha_end_index = null_index + 21
-    sha_bytes = data[null_index + 1 : sha_end_index]
-    sha_int = int.from_bytes(sha_bytes, byteorder="big")
-    sha = hex(sha_int)[2:]  # Ditch the '0x' added to the begining
-
-    return sha_end_index, TreeNode(mode=mode, path=path, sha=sha)

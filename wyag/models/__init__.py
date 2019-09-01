@@ -1,4 +1,4 @@
 """Wyag models."""
 
-from . import objects
+from . import message, objects
 from .repo import Repository

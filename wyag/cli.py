@@ -25,6 +25,19 @@ def cat_file(obj_type, obj_sha):
     services.objects.cat_object(repo, obj_sha, obj_type)
 
 
+@click.command()
+@click.argument("sha", metavar="COMMIT")
+@click.argument("path")
+def checkout(sha, path):
+    """Checkout a new branch at the specified COMMIT.
+
+    PATH must be an EMPTY directory to checkout in.
+    """
+
+    repo = services.repo.find_repo()
+    services.tree.checkout(repo, sha, path)
+
+
 @click.command("hash-object")
 @click.argument("file_name", metavar="FILE")
 @click.option(
@@ -77,6 +90,7 @@ def version():
 
 # Add all of the subcommands to the main group
 wyag.add_command(cat_file)
+wyag.add_command(checkout)
 wyag.add_command(hash_object)
 wyag.add_command(init)
 wyag.add_command(log)
