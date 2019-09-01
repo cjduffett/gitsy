@@ -3,7 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from .messages import Message
+from ..services.message import read_message, write_message
+from .message import Message
 from .repo import Repository
 
 
@@ -42,28 +43,30 @@ class Blob(Object):
         self.blob_data = data
 
 
-class Commit(Object, Message):
+class Commit(Object):
     """A Git commit."""
 
     type_ = "commit"
+    message: Message
 
     def deserialize(self, data: bytes):
-        self.message = self._parse_message(data)
+        self.message = read_message(data)
 
     def serialize(self) -> bytes:
-        return self._write_message(self.message)
+        return write_message(self.message)
 
 
-class Tag(Object, Message):
+class Tag(Object):
     """A Git tag."""
 
     type_ = "tag"
+    message: Message
 
     def deserialize(self, data: bytes):
-        self.message = self._parse_message(data)
+        self.message = read_message(data)
 
     def serialize(self) -> bytes:
-        return self._write_message(self.message)
+        return write_message(self.message)
 
 
 class Tree(Object):
