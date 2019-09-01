@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Optional, Union
 
-from ..models import Repository
+from ..models.repo import Repository
 
 
 def init_repo(path: str) -> Repository:

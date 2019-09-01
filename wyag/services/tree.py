@@ -1,15 +1,17 @@
 """Git tree manipulation services."""
 
-from typing import List, Tuple
+from typing import List, Tuple, cast
 
-from .. import models
+from ..models.objects import Tree, TreeNode
+from ..models.repo import Repository
+from .objects import read_object
 
 
-def read_nodes(data: bytes) -> List[models.objects.TreeNode]:
+def read_nodes(data: bytes) -> List[TreeNode]:
     """Read a Git Tree's nodes."""
 
     index: int = 0
-    nodes: List[models.objects.TreeNode] = list()
+    nodes: List[TreeNode] = list()
 
     while index < len(data):
         index, node = _parse_node(data, start=index)
@@ -18,7 +20,7 @@ def read_nodes(data: bytes) -> List[models.objects.TreeNode]:
     return nodes
 
 
-def write_nodes(nodes: List[models.objects.TreeNode]) -> bytes:
+def write_nodes(nodes: List[TreeNode]) -> bytes:
     """Write a Git Tree's nodes to bytes."""
 
     data = b""
@@ -31,7 +33,22 @@ def write_nodes(nodes: List[models.objects.TreeNode]) -> bytes:
     return data
 
 
-def _parse_node(data: bytes, start: int = 0) -> Tuple[int, models.objects.TreeNode]:
+def ls_tree(repo: Repository, tree_sha: str) -> None:
+    """Print the specified Tree."""
+
+    tree = cast(Tree, read_object(repo, tree_sha, obj_type="tree"))
+
+    for node in tree.nodes:
+        # Left pad with zeros to always display a 6-digit file mode
+        display_mode = "0" * (6 - len(node.mode)) + node.mode.decode("ascii")
+
+        # Read the object referenced by this node
+        node_obj = read_object(repo, node.sha)
+
+        print(f"{display_mode} {node_obj.type_} {node.sha} {node.path.decode('ascii')}")
+
+
+def _parse_node(data: bytes, start: int = 0) -> Tuple[int, TreeNode]:
     """Parse a Node of a Git Tree.
 
     Format: `[mode] space [path] 0x00 [sha-1]`
@@ -55,4 +72,4 @@ def _parse_node(data: bytes, start: int = 0) -> Tuple[int, models.objects.TreeNo
     sha_int = int.from_bytes(sha_bytes, byteorder="big")
     sha = hex(sha_int)[2:]  # Ditch the '0x' added to the begining
 
-    return sha_end_index, models.objects.TreeNode(mode=mode, path=path, sha=sha)
+    return sha_end_index, TreeNode(mode=mode, path=path, sha=sha)

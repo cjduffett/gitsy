@@ -5,12 +5,11 @@ import zlib
 from pathlib import Path
 from typing import Optional, Type, cast
 
-from .. import models
+from ..models import objects
+from ..models.repo import Repository
 
 
-def read_object(
-    repo: models.Repository, sha: str, obj_type: Optional[str] = None
-) -> models.objects.Object:
+def read_object(repo: Repository, sha: str, obj_type: Optional[str] = None) -> objects.Object:
     """Load the specified Git object from the filesystem, if it exists.
 
     Optionall specify `obj_type` to validate that the retrieved object is of the given type.
@@ -44,7 +43,7 @@ def read_object(
     return obj_class(repo, obj_data)
 
 
-def cat_object(repo: models.Repository, sha: str, obj_type: str) -> None:
+def cat_object(repo: Repository, sha: str, obj_type: str) -> None:
     """Display the given object of the specified type."""
 
     full_sha = resolve_sha(repo, name=sha, obj_type=obj_type)
@@ -52,7 +51,7 @@ def cat_object(repo: models.Repository, sha: str, obj_type: str) -> None:
     print(obj.serialize())
 
 
-def write_object(obj: models.objects.Object, write: bool = True) -> str:
+def write_object(obj: objects.Object, write: bool = True) -> str:
     """Serialize object data and generate a new SHA-1 hash of that object."""
 
     obj_data = obj.serialize()
@@ -72,7 +71,7 @@ def write_object(obj: models.objects.Object, write: bool = True) -> str:
 
 
 def hash_object(
-    repo: models.Repository, file_name: str, obj_type: str = "blob", write: bool = False
+    repo: Repository, file_name: str, obj_type: str = "blob", write: bool = False
 ) -> str:
     """Reads the given file and generates a SHA-1 hash of its contents.
 
@@ -91,15 +90,15 @@ def hash_object(
     return write_object(obj, write=write)
 
 
-def log_history(repo: models.Repository, commit_sha: str) -> None:
+def log_history(repo: Repository, commit_sha: str) -> None:
     """Logs a history of Commits to the console, starting with the given commit SHA."""
 
     full_sha = resolve_sha(repo, commit_sha, obj_type="commit")
-    commit = cast(models.objects.Commit, read_object(repo, full_sha, obj_type="commit"))
+    commit = cast(objects.Commit, read_object(repo, full_sha, obj_type="commit"))
     _log_commit(commit, commit_sha)
 
 
-def _log_commit(commit: models.objects.Commit, commit_sha: str) -> None:
+def _log_commit(commit: objects.Commit, commit_sha: str) -> None:
     """Logs a single Commit to the console."""
 
     print(f"commit: {commit_sha}")
@@ -111,20 +110,20 @@ def _log_commit(commit: models.objects.Commit, commit_sha: str) -> None:
     print(f"\n\t{str(commit.message.text)}")
 
 
-def resolve_sha(repo: models.Repository, name: str, obj_type: str, follow: bool = True) -> str:
+def resolve_sha(repo: Repository, name: str, obj_type: str, follow: bool = True) -> str:
     """Resolves the name of a Git Object to its full SHA-1 hash."""
     return name  # TODO: implement name resolution
 
 
-def _get_object_class(obj_type: str) -> Type[models.objects.Object]:
+def _get_object_class(obj_type: str) -> Type[objects.Object]:
     """Get the Object subclass for the given type."""
 
     try:
         return {
-            "blob": models.objects.Blob,
-            "commit": models.objects.Commit,
-            "tag": models.objects.Tag,
-            "tree": models.objects.Tree,
+            "blob": objects.Blob,
+            "commit": objects.Commit,
+            "tag": objects.Tag,
+            "tree": objects.Tree,
         }[obj_type]
 
     except KeyError:
