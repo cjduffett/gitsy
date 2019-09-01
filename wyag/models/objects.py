@@ -1,7 +1,6 @@
 """Git Object model."""
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any, Optional
 
 from .repo import Repository
@@ -10,15 +9,7 @@ from .repo import Repository
 class Object(ABC):
     """A Git object."""
 
-    class ObjectType(Enum):
-        """A type of Git object."""
-
-        blob = "blob"
-        commit = "commit"
-        tag = "tag"
-        tree = "tree"
-
-    type_: ObjectType
+    type_: str
     repo: Repository
     data: bytes
 
@@ -40,7 +31,7 @@ class Object(ABC):
 class Blob(Object):
     """A Git blob."""
 
-    type_ = Object.ObjectType.blob
+    type_ = "blob"
     blob_data: bytes
 
     def serialize(self) -> bytes:
@@ -53,7 +44,7 @@ class Blob(Object):
 class Commit(Object):
     """A Git commit."""
 
-    type_ = Object.ObjectType.commit
+    type_ = "commit"
 
     def serialize(self) -> bytes:
         return b""
@@ -65,7 +56,7 @@ class Commit(Object):
 class Tag(Object):
     """A Git tag."""
 
-    type_ = Object.ObjectType.tag
+    type_ = "tag"
 
     def serialize(self) -> bytes:
         return b""
@@ -77,7 +68,7 @@ class Tag(Object):
 class Tree(Object):
     """A Git tree."""
 
-    type_ = Object.ObjectType.tree
+    type_ = "tree"
 
     def serialize(self) -> bytes:
         return b""
