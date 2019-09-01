@@ -1,3 +1,3 @@
 """Wyag services."""
 
-from . import objects, repo
+from . import message, objects, repo, tree

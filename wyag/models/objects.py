@@ -1,9 +1,10 @@
 """Git Object model."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import List, NamedTuple, Optional
 
 from ..services.message import read_message, write_message
+from ..services.tree import read_nodes, write_nodes
 from .message import Message
 from .repo import Repository
 
@@ -69,13 +70,22 @@ class Tag(Object):
         return write_message(self.message)
 
 
+class TreeNode(NamedTuple):
+    """A node of a Git Tree."""
+
+    mode: bytes
+    path: bytes
+    sha: str
+
+
 class Tree(Object):
     """A Git tree."""
 
     type_ = "tree"
+    nodes: List[TreeNode]
+
+    def deserialize(self, data: bytes):
+        self.nodes = read_nodes(data)
 
     def serialize(self) -> bytes:
-        return b""
-
-    def deserialize(self, data: bytes) -> Any:
-        return "tree"
+        return write_nodes(self.nodes)
