@@ -12,6 +12,7 @@ VERSION = "0.1.0"
 @click.group()
 def wyag():
     """The stupid content tracker."""
+
     sys.tracebacklimit = 0  # Disable error tracebacks
 
 
@@ -27,11 +28,11 @@ def cat_file(obj_type, obj_sha):
 
 @click.command()
 @click.argument("sha", metavar="COMMIT")
-@click.argument("path")
+@click.argument("path", default=".")
 def checkout(sha, path):
-    """Checkout a new branch at the specified COMMIT.
+    """Checkout a COMMIT in the directory specified by PATH.
 
-    PATH must be an EMPTY directory to checkout in.
+    PATH must be an EMPTY directory.
     """
 
     repo = services.repo.find_repo()
@@ -61,6 +62,7 @@ def hash_object(file_name, obj_type, write):
 @click.argument("path", default=".")
 def init(path):
     """Initialize a new, empty repository."""
+
     services.repo.init_repo(path)
 
 
@@ -84,11 +86,34 @@ def ls_tree(tree_sha):
 
 @click.command("show-ref")
 def show_ref():
-    """List references."""
+    """List references in a local repository."""
 
     repo = services.repo.find_repo(required=True)
     refs = services.refs.list_refs(repo)
-    services.refs.show_refs(repo, refs)
+    services.refs.show_refs(refs)
+
+
+@click.command()
+@click.argument("name", default="HEAD")
+@click.argument("obj_sha", required=False)
+@click.option("-a", "create_tag_obj", is_flag=True, help="Create a tag object.")
+def tag(name, obj_sha, create_tag_obj):
+    """List tags or create a new tag with the specified NAME.
+
+    Optionally specify an OBJECT the new tag will point to.
+    """
+
+    repo = services.repo.find_repo(required=create_tag_obj)
+
+    if name:
+        # Create a new tag with the specified NAME
+        tag_type = "object" if create_tag_obj else "ref"
+        services.tags.create_tag(name, obj_sha, tag_type)
+
+    else:
+        # List tags
+        refs = services.refs.list_refs(repo)
+        services.refs.show_refs(refs["tags"], show_hash=False)
 
 
 @click.command()
@@ -105,4 +130,5 @@ wyag.add_command(init)
 wyag.add_command(log)
 wyag.add_command(ls_tree)
 wyag.add_command(show_ref)
+wyag.add_command(tag)
 wyag.add_command(version)

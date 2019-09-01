@@ -1,3 +1,3 @@
 """Wyag services."""
 
-from . import objects, refs, repo, tree
+from . import objects, refs, repo, tags, tree
