@@ -7,6 +7,7 @@ import click
 from . import services
 
 VERSION = "0.1.0"
+OBJECT_TYPE_CHOICES = ["blob", "commit", "tag", "tree"]
 
 
 @click.group()
@@ -45,7 +46,7 @@ def checkout(sha, path):
     "-t",
     "--type",
     "obj_type",
-    type=click.Choice(["blob", "commit", "tag", "tree"]),
+    type=click.Choice(OBJECT_TYPE_CHOICES),
     default="blob",
     help="The type of object.",
 )
@@ -82,6 +83,27 @@ def ls_tree(tree_sha):
 
     repo = services.repo.find_repo(required=True)
     services.tree.ls_tree(repo, tree_sha)
+
+
+@click.command("rev-parse")
+@click.argument("name")
+@click.option(
+    "-t",
+    "--type",
+    "obj_type",
+    choices=click.Choice(OBJECT_TYPE_CHOICES),
+    default=None,
+    help="The expected object type.",
+)
+def rev_parse(name, obj_type):
+    """Parse the specified revision or object NAME identifier.
+
+    Optionally specify the expected object TYPE.
+    """
+
+    repo = services.repo.find_repo()
+    obj_sha = services.objects.find_object(repo, name, obj_type=obj_type, follow=True)
+    print(obj_sha)
 
 
 @click.command("show-ref")
