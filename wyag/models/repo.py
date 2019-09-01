@@ -72,21 +72,21 @@ class Repository:
 
         return file_path
 
-    # def repo_dir(self, dir_name: Union[Path, str], mkdir: bool = False) -> Path:
-    #     """Returns a Path to the named directory within the .git directory.
+    def repo_dir(self, dir_name: Union[Path, str], mkdir: bool = False) -> Path:
+        """Returns a Path to the named directory within the .git directory.
 
-    #     If `mkdir = True` creates the Path if it does not exist.
-    #     """
+        If `mkdir = True` creates the Path if it does not exist.
+        """
 
-    #     dir_path = self.gitdir / dir_name
+        dir_path = self.gitdir / dir_name
 
-    #     if mkdir and not dir_path.exists():
-    #         dir_path.mkdir(parents=True)
+        if mkdir and not dir_path.exists():
+            dir_path.mkdir(parents=True)
 
-    #     if not dir_path.is_dir():
-    #         raise Exception(f"{dir_path} is not a directory!")
+        if not dir_path.is_dir():
+            raise Exception(f"{dir_path} is not a directory!")
 
-    #     return dir_path
+        return dir_path
 
     @property
     def default_config(self) -> ConfigParser:
