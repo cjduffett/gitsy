@@ -59,11 +59,9 @@ class Commit(Object):
         """Returns the full SHA-1 hash of the Tree this Commit belongs to."""
 
         try:
-            tree_sha = str(self.message.headers[b"tree"][0], "ascii")
+            return str(self.message.headers[b"tree"][0], "ascii")
         except (KeyError, IndexError):
             raise Exception("Commit message does not specify a tree!")
-
-        return tree_sha
 
 
 class Tag(Object):
@@ -77,6 +75,15 @@ class Tag(Object):
 
     def serialize(self) -> bytes:
         return self.message.write()
+
+    @property
+    def object_sha(self) -> str:
+        """Returns the full SHA-1 of the Object this Tag references."""
+
+        try:
+            return str(self.message.headers[b"object"][0], "ascii")
+        except (KeyError, IndexError):
+            raise Exception("Tag message does not specify an object!")
 
 
 class TreeNode(NamedTuple):
