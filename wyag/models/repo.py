@@ -1,8 +1,8 @@
-"""Wyag Repository models."""
+"""Git Repository model."""
 
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 
 class Repository:
@@ -14,7 +14,7 @@ class Repository:
     config_file: Path
     config: ConfigParser
 
-    def __init__(self, path: str, force: bool = False) -> None:
+    def __init__(self, path: Union[Path, str], force: bool = False) -> None:
         """Initialize the Git repository."""
 
         # If force = True, continue with initialization in the face of errors
@@ -30,6 +30,9 @@ class Repository:
         self.config = ConfigParser()  # Add config defaults here, if needed
 
         self._parse_config_file()
+
+    def __repr__(self) -> str:
+        return f"Repository('{self.worktree}')"
 
     def _parse_config_file(self):
         """Parse the Git config .ini file in the project's git directory."""
@@ -84,6 +87,28 @@ class Repository:
             raise Exception(f"{dir_path} is not a directory!")
 
         return dir_path
+
+    @classmethod
+    def find(cls, path: Union[Path, str] = ".", required: bool = True) -> Optional["Repository"]:
+        """Find a return the git repository containing the specified path."""
+
+        current_dir = Path(path).resolve()
+
+        gitdir = current_dir / ".git"
+
+        if gitdir.exists():
+            return cls(path)
+
+        # Base case, we've hit the filesystem root without finding a .git directory.
+        # The 'parent' of the root directory IS the root directory.
+        if current_dir.parent == current_dir:
+            if not required:
+                return None
+
+            raise Exception("No .git directory found.")
+
+        # If we haven't found a .git directory yet, recurse into the parent and try again.
+        return cls.find(current_dir.parent, required)
 
     @property
     def default_config(self) -> ConfigParser:
