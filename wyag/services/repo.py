@@ -1,6 +1,6 @@
-"""Wyag command services."""
+"""Repository services."""
 
-from .models import Repository
+from ..models import Repository
 
 
 def init_repo(path: str) -> Repository:
@@ -23,16 +23,21 @@ def init_repo(path: str) -> Repository:
             raise Exception(f"{repo.worktree} is not an empty directory!")
 
     # .git/description
+    description_file = repo.repo_file("description", touch=True)
 
-    with repo.repo_file("description", touch=True).open("w") as f:
+    with description_file.open("w") as f:
         f.write("Unnamed repository; edit this file 'description' to name the repository.\n")
 
     # .git/HEAD
-    with repo.repo_file("HEAD", touch=True).open("w") as f:
+    head_file = repo.repo_file("HEAD", touch=True)
+
+    with head_file.open("w") as f:
         f.write("ref: refs/heads/master\n")
 
     # .git/config
-    with repo.repo_file("config", touch=True).open("w") as f:
+    config_file = repo.repo_file("config", touch=True)
+
+    with config_file.open("w") as f:
         repo.default_config.write(f)
 
     print(f"Initialized empty git repository in {repo.worktree}")
