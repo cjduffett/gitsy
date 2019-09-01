@@ -5,13 +5,13 @@ from typing import Union, cast
 
 from ..models import objects
 from ..models.repo import Repository
-from .objects import read_object, resolve_sha
+from .objects import read_object, resolve_object
 
 
 def checkout(repo: Repository, sha: str, path: str = "."):
     """Checkout the specified Commit or Tree."""
 
-    full_sha = resolve_sha(repo, name=sha)
+    full_sha = resolve_object(repo, name=sha)[0]
     obj = read_object(repo, full_sha)
 
     # If the specified object is a Commit, grab its Tree
