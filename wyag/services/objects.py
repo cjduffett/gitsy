@@ -1,12 +1,14 @@
 """Object services."""
 
 import hashlib
+import re
 import zlib
 from pathlib import Path
-from typing import Optional, Type, cast
+from typing import List, Optional, Type, cast
 
 from ..models import objects
 from ..models.repo import Repository
+from .refs import resolve_ref
 
 
 def read_object(repo: Repository, sha: str, obj_type: Optional[str] = None) -> objects.Object:
@@ -46,7 +48,7 @@ def read_object(repo: Repository, sha: str, obj_type: Optional[str] = None) -> o
 def cat_object(repo: Repository, sha: str, obj_type: str) -> None:
     """Display the given object of the specified type."""
 
-    full_sha = resolve_sha(repo, name=sha, obj_type=obj_type)
+    full_sha = resolve_object(repo, name=sha, obj_type=obj_type)[0]
     obj = read_object(repo, full_sha, obj_type=obj_type)
     print(obj.serialize())
 
@@ -90,10 +92,94 @@ def hash_object(
     return write_object(obj, write=write)
 
 
+def resolve_object(repo: Repository, name: str) -> List[str]:
+    """Resolves the name of a Git Object to its full SHA-1 hash.
+
+    This method is aware of:
+    - The HEAD literal
+    - Short and long hashes
+    - Tags
+    - Branches
+    - Remote branches
+    """
+
+    candidates: List[str] = list()
+    LONG_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{1,16}$")
+    SHORT_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{1,16}$")
+
+    # Abort if empty string
+    if not name.strip():
+        raise Exception("No name given!")
+
+    if name == "HEAD":
+        return [resolve_ref(repo, "HEAD")]
+
+    if LONG_HASH_REGEX.match(name):
+        if len(name) == 40:
+            # This is a complete hash
+            return [name.lower()]
+
+    if SHORT_HASH_REGEX.match(name):
+        if len(name) >= 4:
+            # This is a short hash. The minimum length for short hash references is 4 characters.
+            name = name.lower()
+            prefix = name[0:2]
+            path = repo.repo_dir("objects", mkdir=False) / prefix
+
+            rest = name[2:]
+            for file_ in path.iterdir():
+                if file_.name.startswith(rest):
+                    candidates.append(prefix + file_.name)
+
+    return candidates
+
+
+def find_object(
+    repo: Repository, name: str, obj_type: Optional[str] = None, follow: bool = True
+) -> Optional[str]:
+    """Find the Object with the given name. Returns None if no Object is found."""
+
+    candidates = resolve_object(repo, name)
+
+    if not candidates:
+        raise Exception(f"No such reference {name}")
+
+    if len(candidates) > 1:
+        display_candidates = "\n - ".join(candidates)
+        raise Exception(f"Ambiguous reference {name}, candidates are:\n - {display_candidates}")
+
+    sha = candidates[0]
+
+    if not obj_type:
+        return sha
+
+    while True:
+        obj = read_object(repo, sha)
+
+        # Object is of the requested type
+        if obj.type_ == obj_type:
+            return sha
+
+        if not follow:
+            return None
+
+        # Follow tags
+        if obj.type_ == "tag":
+            tag = cast(objects.Tag, obj)
+            sha = tag.object_sha
+
+        elif obj.type_ == "commit" and obj_type == "tree":
+            commit = cast(objects.Commit, obj)
+            sha = commit.tree_sha
+        else:
+            return None
+
+
 def log_history(repo: Repository, commit_sha: str) -> None:
     """Logs a history of Commits to the console, starting with the given commit SHA."""
 
-    full_sha = resolve_sha(repo, commit_sha, obj_type="commit")
+    full_sha = find_object(repo, commit_sha, obj_type="commit")
+    assert full_sha
     commit = cast(objects.Commit, read_object(repo, full_sha, obj_type="commit"))
     _log_commit(commit, commit_sha)
 
@@ -108,13 +194,6 @@ def _log_commit(commit: objects.Commit, commit_sha: str) -> None:
     print(f"Author: {author.name} <{author.email}>")
     print(f"Date:   {author.authored_at}")
     print(f"\n\t{str(commit.message.text)}")
-
-
-def resolve_sha(
-    repo: Repository, name: str, obj_type: Optional[str] = None, follow: bool = True
-) -> str:
-    """Resolves the name of a Git Object to its full SHA-1 hash."""
-    return name  # TODO: implement name resolution
 
 
 def _get_object_class(obj_type: str) -> Type[objects.Object]:
