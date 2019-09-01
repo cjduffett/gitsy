@@ -27,7 +27,7 @@ class Repository:
             raise Exception(f"Not a git repository {self.gitdir}")
 
         self.config_file = self.gitdir / "config"
-        self.config = ConfigParser()  # Add config defaults here, if needed
+        self.config = ConfigParser()
 
         self._parse_config_file()
 
@@ -56,15 +56,15 @@ class Repository:
             raise Exception(f"Unsupported repositoryformatversion {version}")
 
     def repo_file(self, file_name: Union[Path, str], touch: bool = False) -> Path:
-        """Returns a Path to the named file within the repository.
+        """Returns a Path to the named file within the .git directory.
 
-        If `touch` = True creates an empty file if it does not exist.
+        If `touch = True` creates an empty file if it does not exist.
         """
 
         file_path = self.gitdir / file_name
 
-        if touch and not file_path.exists():
-            self.repo_dir(file_path.parent, mkdir=True)
+        if touch:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.touch()
 
         if not file_path.exists():
@@ -72,21 +72,21 @@ class Repository:
 
         return file_path
 
-    def repo_dir(self, dir_name: Union[Path, str], mkdir: bool = False) -> Path:
-        """Returns a Path to the named directory within the repository.
+    # def repo_dir(self, dir_name: Union[Path, str], mkdir: bool = False) -> Path:
+    #     """Returns a Path to the named directory within the .git directory.
 
-        If `mkdir` = True creates the Path if it does not exist.
-        """
+    #     If `mkdir = True` creates the Path if it does not exist.
+    #     """
 
-        dir_path = self.gitdir / dir_name
+    #     dir_path = self.gitdir / dir_name
 
-        if mkdir and not dir_path.exists():
-            dir_path.mkdir(parents=True)
+    #     if mkdir and not dir_path.exists():
+    #         dir_path.mkdir(parents=True)
 
-        if not dir_path.is_dir():
-            raise Exception(f"{dir_path} is not a directory!")
+    #     if not dir_path.is_dir():
+    #         raise Exception(f"{dir_path} is not a directory!")
 
-        return dir_path
+    #     return dir_path
 
     @property
     def default_config(self) -> ConfigParser:

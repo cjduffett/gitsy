@@ -29,15 +29,36 @@ def init(path):
 
 
 @click.command("cat-file")
-@click.argument("object_", metavar="OBJECT")
-def cat_file(object_):
+@click.argument("obj_type", metavar="TYPE")
+@click.argument("obj_sha", metavar="OBJECT")
+def cat_file(obj_type, obj_sha):
     """Print the specified OBJECT."""
 
     repo = services.repo.find_repo()
-    services.objects.cat_object(repo, object_)
+    services.objects.cat_object(repo, obj_sha, obj_type)
+
+
+@click.command("hash-object")
+@click.argument("file_name", metavar="FILE")
+@click.option(
+    "-t",
+    "--type",
+    "obj_type",
+    type=click.Choice(["blob", "commit", "tag", "tree"]),
+    default="blob",
+    help="The type of object.",
+)
+@click.option("-w", "--write", is_flag=True, help="Write the hashed file to disk.")
+def hash_object(file_name, obj_type, write):
+    """Compute the SHA-1 hash of the specified FILE."""
+
+    repo = services.repo.find_repo(required=write)
+    sha = services.objects.hash_object(repo, file_name, obj_type=obj_type, write=write)
+    print(sha)
 
 
 # Add all of the subcommands to the main group
 wyag.add_command(version)
 wyag.add_command(init)
 wyag.add_command(cat_file)
+wyag.add_command(hash_object)

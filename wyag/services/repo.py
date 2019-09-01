@@ -59,10 +59,13 @@ def find_repo(path: Union[Path, str] = ".", required: bool = True) -> Optional[R
         return Repository(path)
 
     # We've hit the filesystem root if the 'parent' of the current directory is ITSELF.
-    # This is a unique property of the root directory '/'.
+    # This is a unique property of the root directory '/'. If we hit the root, we can
+    # safely say we didn't find a .git directory.
     if current_dir.parent == current_dir:
+        # If an existing repository isn't required for an operation, return
+        # a temporary one based on the current directory.
         if not required:
-            return None
+            return Repository(".")
 
         raise Exception("No .git directory found.")
 
