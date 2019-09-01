@@ -57,8 +57,18 @@ def hash_object(file_name, obj_type, write):
     print(sha)
 
 
+@click.command()
+@click.argument("commit_sha", metavar="COMMIT")
+def log(commit_sha):
+    """Display the history of the specified COMMIT."""
+
+    repo = services.repo.find_repo(required=True)
+    services.objects.log_history(repo, commit_sha)
+
+
 # Add all of the subcommands to the main group
 wyag.add_command(version)
 wyag.add_command(init)
 wyag.add_command(cat_file)
 wyag.add_command(hash_object)
+wyag.add_command(log)

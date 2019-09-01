@@ -3,13 +3,18 @@
 import hashlib
 import zlib
 from pathlib import Path
-from typing import Type
+from typing import Optional, Type, cast
 
 from .. import models
 
 
-def read_object(repo: models.Repository, sha: str) -> models.objects.Object:
-    """Load the specified Git object from the filesystem, if it exists."""
+def read_object(
+    repo: models.Repository, sha: str, obj_type: Optional[str] = None
+) -> models.objects.Object:
+    """Load the specified Git object from the filesystem, if it exists.
+
+    Optionall specify `obj_type` to validate that the retrieved object is of the given type.
+    """
 
     obj_path = Path("objects") / sha[0:2] / sha[2:]
     obj_file = repo.repo_file(obj_path)
@@ -22,7 +27,10 @@ def read_object(repo: models.Repository, sha: str) -> models.objects.Object:
 
     # Read object type
     space_index = raw_data.find(b" ")
-    obj_type = raw_data[0:space_index].decode("utf-8")
+    found_obj_type = raw_data[0:space_index].decode("utf-8")
+
+    if obj_type and found_obj_type != obj_type:
+        raise Exception(f"Object {sha} is not of type {obj_type!r}!")
 
     # Read and validate object size
     null_index = raw_data.find(b"\x00")
@@ -32,18 +40,15 @@ def read_object(repo: models.Repository, sha: str) -> models.objects.Object:
         raise Exception(f"Malformed object {sha}: bad length")
 
     obj_data = raw_data[null_index + 1 :]
-    obj_class = _get_object_class(obj_type)
+    obj_class = _get_object_class(found_obj_type)
     return obj_class(repo, obj_data)
 
 
 def cat_object(repo: models.Repository, sha: str, obj_type: str) -> None:
     """Display the given object of the specified type."""
 
-    obj = read_object(repo, resolve_sha(repo, name=sha, obj_type=obj_type))
-
-    if obj.type_ != obj_type:
-        raise Exception(f"Object {sha} is not of type {obj_type!r}")
-
+    full_sha = resolve_sha(repo, name=sha, obj_type=obj_type)
+    obj = read_object(repo, full_sha, obj_type=obj_type)
     print(obj.serialize())
 
 
@@ -84,6 +89,26 @@ def hash_object(
     obj = obj_class(repo, obj_data)
 
     return write_object(obj, write=write)
+
+
+def log_history(repo: models.Repository, commit_sha: str) -> None:
+    """Logs a history of Commits to the console, starting with the given commit SHA."""
+
+    full_sha = resolve_sha(repo, commit_sha, obj_type="commit")
+    commit = cast(models.objects.Commit, read_object(repo, full_sha, obj_type="commit"))
+    _log_commit(commit, commit_sha)
+
+
+def _log_commit(commit: models.objects.Commit, commit_sha: str) -> None:
+    """Logs a single Commit to the console."""
+
+    print(f"commit: {commit_sha}")
+
+    author = commit.message.author
+
+    print(f"Author: {author.name} <{author.email}>")
+    print(f"Date:   {author.authored_at}")
+    print(f"\n\t{str(commit.message.text)}")
 
 
 def resolve_sha(repo: models.Repository, name: str, obj_type: str, follow: bool = True) -> str:
