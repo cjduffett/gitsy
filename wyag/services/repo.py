@@ -1,5 +1,8 @@
 """Repository services."""
 
+from pathlib import Path
+from typing import Optional, Union
+
 from ..models import Repository
 
 
@@ -43,3 +46,25 @@ def init_repo(path: str) -> Repository:
     print(f"Initialized empty git repository in {repo.worktree}")
 
     return repo
+
+
+def find_repo(path: Union[Path, str] = ".", required: bool = True) -> Optional[Repository]:
+    """Find a return the git repository containing the specified path."""
+
+    current_dir = Path(path).resolve()
+
+    gitdir = current_dir / ".git"
+
+    if gitdir.exists():
+        return Repository(path)
+
+    # We've hit the filesystem root if the 'parent' of the current directory is ITSELF.
+    # This is a unique property of the root directory '/'.
+    if current_dir.parent == current_dir:
+        if not required:
+            return None
+
+        raise Exception("No .git directory found.")
+
+    # If we haven't found a .git directory yet, recurse into the parent and try again.
+    return find_repo(current_dir.parent, required)

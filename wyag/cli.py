@@ -4,7 +4,7 @@ import sys
 
 import click
 
-from . import models, services
+from . import services
 
 VERSION = "0.1.0"
 
@@ -33,7 +33,7 @@ def init(path):
 def cat_file(object_):
     """Print the specified OBJECT."""
 
-    repo = models.repo.Repository.find()
+    repo = services.repo.find_repo()
     services.objects.cat_object(repo, object_)
 
 
