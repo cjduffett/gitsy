@@ -82,6 +82,15 @@ def ls_tree(tree_sha):
     services.tree.ls_tree(repo, tree_sha)
 
 
+@click.command("show-ref")
+def show_ref():
+    """List references."""
+
+    repo = services.repo.find_repo(required=True)
+    refs = services.refs.list_refs(repo)
+    services.refs.show_refs(repo, refs)
+
+
 @click.command()
 def version():
     """Print this project's version and exit."""
@@ -95,4 +104,5 @@ wyag.add_command(hash_object)
 wyag.add_command(init)
 wyag.add_command(log)
 wyag.add_command(ls_tree)
+wyag.add_command(show_ref)
 wyag.add_command(version)
