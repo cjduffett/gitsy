@@ -1,7 +1,8 @@
 """Commit and Tag messages."""
 
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict, List, NamedTuple, Optional, Union
 
+# The key-value pairs that form the header of a Message.
 MessageHeaders = Dict[bytes, List[bytes]]
 
 
@@ -10,36 +11,126 @@ class MessageAuthor(NamedTuple):
 
     name: str
     email: str
-    authored_at: str
+    authored_at: int  # Unix timestamp
+    timezone: str = "+0000"  # All times in UTC for now
+
+    @classmethod
+    def read_author(cls, data: bytes) -> "MessageAuthor":
+        """Parse and return a MessageAuthor from the given data."""
+
+        # We want all parts as strings, so decode everything first
+        author_data = data.decode("ascii")
+
+        email_start = author_data.find("<")
+        email_end = author_data.find(">", start=email_start + 1)
+        timestamp_end = author_data.find(" ", start=email_end + 1)
+
+        if any(index == -1 for index in [email_start, email_end, timestamp_end]):
+            raise Exception("Malformed message author")
+
+        return cls(
+            name=author_data[0 : email_start - 1],
+            email=author_data[email_start + 1 : email_end],
+            authored_at=int(author_data[email_end + 1 : timestamp_end]),
+            timezone=author_data[timestamp_end + 1 :],
+        )
+
+    def encode(self) -> bytes:
+        """Encode the author for serialization."""
+        return f"{self.name} <{self.email}> {self.authored_at} {self.timezone}".encode("ascii")
 
 
-class Message(NamedTuple):
+class Message:
     """A Commit or Tag message from the object store."""
 
     # Key-value headers parsed from the message body.
     # Repeat instances of a key become a list.
-    headers: MessageHeaders
+    _headers: MessageHeaders
 
     # The commit or tag message text.
-    text: bytes
+    _text: bytes
 
-    @property
-    def author(self) -> MessageAuthor:
-        """Returns the author of the message."""
+    def __init__(
+        self,
+        text: Union[str, bytes],
+        author: Optional[MessageAuthor] = None,
+        headers: Optional[MessageHeaders] = None,
+    ) -> None:
+
+        if headers:
+            self._headers = headers
+        else:
+            self._headers = dict()
+
+        if author:
+            self.set_author(author)
+
+        self.set_text(text)
+
+    def get_header(self, key: Union[str, bytes]) -> str:
+        """Return a single value from the message header, as a string."""
+
+        key = self._convert_bytes(key)
 
         try:
-            author = self.headers[b"author"][0]
-        except (KeyError, IndexError):
-            raise Exception("Message does not have an author!")
+            # If a key exists in the header there must be at least one value.
+            return self._convert_str(self._headers[key][0])
+        except KeyError:
+            raise Exception(f"Message header {self._convert_str(key)!r} not found")
 
-        email_start = author.find(b"<")
-        email_end = author.find(b">")
+    def set_header(self, key: Union[str, bytes], value: Union[str, bytes]):
+        """Set a key-value pair in the message's headers."""
 
-        author_name = str(author[0 : email_start - 1], encoding="ascii")
-        email = str(author[email_start + 1 : email_end], encoding="ascii")
-        authored_at = str(author[email_end + 1 :], encoding="ascii")
+        key = self._convert_bytes(key)
+        self._headers[key] = self._convert_bytes(value)
 
-        return MessageAuthor(name=author_name, email=email, authored_at=authored_at)
+    def get_text(self) -> str:
+        """Returns the message text as a string."""
+
+        return self._convert_str(self._text)
+
+    def set_text(self, text: Union[str, bytes]):
+        """Sets the message text."""
+
+        self._text = self._convert_bytes(text)
+
+    def get_author(self, key: Union[str, bytes] = "author") -> MessageAuthor:
+        """Returns the author of the Message, parsed from the 'author' header.
+
+        Optionally specify a non-default `key` if the message author is stored under a
+        different header key.
+        """
+
+        author_data = self._convert_bytes(self.get_header(key))
+        return MessageAuthor.read_author(author_data)
+
+    def set_author(self, author: MessageAuthor, key: Union[str, bytes] = "author"):
+        """Sets the author of the message.
+
+        The message author is stored in the 'author' header. Optionally specify a
+        non-default `key` to store the author under a different header key.
+        """
+
+        header_value = author.encode()
+        self.set_header(key, header_value)
+
+    @staticmethod
+    def _convert_str(value: Union[str, bytes]) -> str:
+        """Converts the given value to a string if needed."""
+
+        if isinstance(value, bytes):
+            return value.decode("ascii")
+
+        return value
+
+    @staticmethod
+    def _convert_bytes(value: Union[str, bytes]) -> bytes:
+        """Converts the given value to bytes if needed."""
+
+        if isinstance(value, str):
+            return value.encode("ascii")
+
+        return value
 
     @classmethod
     def read_message(
@@ -47,7 +138,7 @@ class Message(NamedTuple):
     ) -> "Message":
         """Read a Git Commit or Tag message's headers and text.
 
-        Commits and Tags are formatted like:
+        Commits and Tag messages are formatted like:
 
         ```
         tree 29ff16c9c14e2652b22f8b78bb08a5a07930c147
@@ -73,8 +164,12 @@ class Message(NamedTuple):
         Initial commit
         ```
 
-        A single value may be continued on several lines, where each subsequent line starts with
-        an additional "continuation space" (see gpgsig as an example of that).
+        Messages start with a "header" of key-value pairs. A single value may be continued on
+        several lines, where each subsequent line starts with an additional "continuation space"
+        (see 'gpgsig' as an example of that).
+
+        A blank line follows the header. The remainder of the message body after the blank line
+        is reserved for the message text.
         """
 
         if not headers:
@@ -84,12 +179,12 @@ class Message(NamedTuple):
         space_index = data.find(b" ", start)
         newline_index = data.find(b"\n", start)
 
-        # If a space appears before a newline, we have a keyword.
-
         # If a newline appears first (before a space), or there's no space at all (-1), we
         # assume a blank line. A blank line means the remainder of the data is the message.
         if space_index < 0 or newline_index < space_index:
             return Message(headers=headers, text=data[start + 1 :])
+
+        # If a space appears before a newline, we have a keyword:
 
         # Read the next key in the body
         key = data[start:space_index]
@@ -120,13 +215,13 @@ class Message(NamedTuple):
 
         data = b""
 
-        for key, values in self.headers.items():
+        for key, values in self._headers.items():
             # Lists will be serialized on adjacent lines
             for value in values:
                 # Add the leading spaces back for continuation lines.
                 data += key + b" " + value.replace(b"\n", b"\n ") + b"\n"
 
         # Append message
-        data = data + b"\n" + self.text
+        data = data + b"\n" + self._text
 
         return data
