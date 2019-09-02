@@ -3,16 +3,15 @@
 from abc import ABC, abstractmethod
 from typing import List, NamedTuple, Optional, Tuple
 
-from .message import Message
+from .message import Message, MessageAuthor
 from .repo import Repository
 
 
 class Object(ABC):
     """A Git object."""
 
-    type_: str
+    type_: str  # Don't set this directly
     repo: Repository
-    data: bytes
 
     def __init__(self, repo: Repository, data: Optional[bytes] = None) -> None:
         self.repo = repo
@@ -33,57 +32,98 @@ class Blob(Object):
     """A Git blob."""
 
     type_ = "blob"
-    blob_data: bytes
+    data: bytes
 
     def serialize(self) -> bytes:
-        return self.blob_data
+        return self.data
 
     def deserialize(self, data: bytes):
-        self.blob_data = data
+        self.data = data
 
 
 class Commit(Object):
     """A Git commit."""
 
     type_ = "commit"
-    message: Message
+
+    # The author of the commit.
+    author: MessageAuthor
+
+    # The commit message text.
+    message: str
+
+    # The full SHA-1 hash of the worktree's root tree.
+    tree_sha: str
 
     def deserialize(self, data: bytes):
-        self.message = Message.read_message(data)
+        """Parse the Commit from a Message."""
+
+        message = Message.read_message(data)
+
+        self.tree_sha = message.get_header("tree")
+        self.author = message.get_author()
+        self.message = message.get_text()
 
     def serialize(self) -> bytes:
-        return self.message.write()
+        """Create a Message from the Commit and write that Message to bytes."""
 
-    @property
-    def tree_sha(self) -> str:
-        """Returns the full SHA-1 hash of the Tree this Commit belongs to."""
-
-        try:
-            return str(self.message.headers[b"tree"][0], "ascii")
-        except (KeyError, IndexError):
-            raise Exception("Commit message does not specify a tree!")
+        message = Message(author=self.author, text=self.message)
+        message.set_header("tree", self.tree_sha)
+        return message.write()
 
 
 class Tag(Object):
-    """A Git tag."""
+    """A Git tag.
+
+    Tag objects are stored as messages, formatted like:
+    ```
+    object b6a7fad7ec645c74f26dfe5b28fc73c29d6c7182
+    type commit
+    tag 1.0.0
+    tagger Carlton Duffett <carlton.duffett@gmail.com> 1567444360 -0700
+
+    Initial release
+    ```
+    """
 
     type_ = "tag"
-    message: Message
+
+    # The author of the tag.
+    author: MessageAuthor
+
+    # The tag message text.
+    message: str
+
+    # The name used to refer to the tag.
+    name: str
+
+    # Full SHA-1 hash of the object being tagged.
+    obj_sha: str
+
+    # The type of object this tag refers to.
+    obj_type: str
 
     def deserialize(self, data: bytes):
-        self.message = Message.read_message(data)
+        """Parse the Tag from a Message."""
+
+        message = Message.read_message(data)
+
+        self.author = message.get_author(key="tagger")
+        self.message = message.get_text()
+        self.obj_sha = message.get_header("object")
+        self.obj_type = message.get_header("type")
+        self.name = message.get_header("tag")
 
     def serialize(self) -> bytes:
-        return self.message.write()
+        """Create a Message from the Tag and write that message to bytes."""
 
-    @property
-    def object_sha(self) -> str:
-        """Returns the full SHA-1 of the Object this Tag references."""
+        message = Message(text=self.message)
+        message.set_author(self.author, key="tagger")
+        message.set_header("object", self.obj_sha)
+        message.set_header("type", self.obj_type)
+        message.set_header("tag", self.name)
 
-        try:
-            return str(self.message.headers[b"object"][0], "ascii")
-        except (KeyError, IndexError):
-            raise Exception("Tag message does not specify an object!")
+        return message.write()
 
 
 class TreeNode(NamedTuple):
