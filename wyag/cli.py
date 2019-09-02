@@ -40,6 +40,16 @@ def checkout(sha, path):
     services.tree.checkout(repo, sha, path)
 
 
+@click.command()
+@click.option("-m", "--message", help="Commit message.")
+@click.option("-a", "--all", "add_all", is_flag=True, help="Commit all tracked changes.")
+def commit(message, add_all):
+    """Commit staged changes."""
+
+    repo = services.repo.find_repo(required=True)
+    services.commit.create_commit(repo, message, add_all)
+
+
 @click.command("hash-object")
 @click.argument("file_name", metavar="FILE")
 @click.option(
@@ -147,6 +157,7 @@ def version():
 # Add all of the subcommands to the main group
 wyag.add_command(cat_file)
 wyag.add_command(checkout)
+wyag.add_command(commit)
 wyag.add_command(hash_object)
 wyag.add_command(init)
 wyag.add_command(log)
