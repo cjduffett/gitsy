@@ -15,29 +15,26 @@ class MessageAuthor(NamedTuple):
     timezone: str = "+0000"  # All times in UTC for now
 
     @classmethod
-    def read_author(cls, data: bytes) -> "MessageAuthor":
+    def parse(cls, data: bytes) -> "MessageAuthor":
         """Parse and return a MessageAuthor from the given data."""
 
-        # We want all parts as strings, so decode everything first
-        author_data = data.decode("ascii")
-
-        email_start = author_data.find("<")
-        email_end = author_data.find(">", start=email_start + 1)
-        timestamp_end = author_data.find(" ", start=email_end + 1)
+        email_start = data.find(b"<")
+        email_end = data.find(b">", email_start + 1)
+        timestamp_end = data.find(b" ", email_end + 2)
 
         if any(index == -1 for index in [email_start, email_end, timestamp_end]):
-            raise Exception("Malformed message author")
+            raise Exception("Message author is malformed!")
 
         return cls(
-            name=author_data[0 : email_start - 1],
-            email=author_data[email_start + 1 : email_end],
-            authored_at=int(author_data[email_end + 1 : timestamp_end]),
-            timezone=author_data[timestamp_end + 1 :],
+            name=_convert_str(data[0 : email_start - 1]),
+            email=_convert_str(data[email_start + 1 : email_end]),
+            authored_at=int(data[email_end + 1 : timestamp_end]),
+            timezone=_convert_str(data[timestamp_end + 1 :]),
         )
 
-    def encode(self) -> bytes:
-        """Encode the author for serialization."""
-        return f"{self.name} <{self.email}> {self.authored_at} {self.timezone}".encode("ascii")
+    def write(self) -> bytes:
+        """Write the author to bytes."""
+        return f"{self.name} <{self.email}> {self.authored_at} {self.timezone}".encode()
 
 
 class Message:
@@ -70,29 +67,34 @@ class Message:
     def get_header(self, key: Union[str, bytes]) -> str:
         """Return a single value from the message header, as a string."""
 
-        key = self._convert_bytes(key)
+        key = _convert_bytes(key)
 
         try:
             # If a key exists in the header there must be at least one value.
-            return self._convert_str(self._headers[key][0])
+            return _convert_str(self._headers[key][0])
         except KeyError:
-            raise Exception(f"Message header {self._convert_str(key)!r} not found")
+            raise Exception(f"Message header {_convert_str(key)!r} not found!")
 
     def set_header(self, key: Union[str, bytes], value: Union[str, bytes]):
         """Set a key-value pair in the message's headers."""
 
-        key = self._convert_bytes(key)
-        self._headers[key] = self._convert_bytes(value)
+        key = _convert_bytes(key)
+        value = _convert_bytes(value)
+
+        try:
+            self._headers[key].append(value)
+        except KeyError:
+            self._headers[key] = [value]
 
     def get_text(self) -> str:
         """Returns the message text as a string."""
 
-        return self._convert_str(self._text)
+        return _convert_str(self._text)
 
     def set_text(self, text: Union[str, bytes]):
         """Sets the message text."""
 
-        self._text = self._convert_bytes(text)
+        self._text = _convert_bytes(text)
 
     def get_author(self, key: Union[str, bytes] = "author") -> MessageAuthor:
         """Returns the author of the Message, parsed from the 'author' header.
@@ -101,8 +103,8 @@ class Message:
         different header key.
         """
 
-        author_data = self._convert_bytes(self.get_header(key))
-        return MessageAuthor.read_author(author_data)
+        author_data = _convert_bytes(self.get_header(key))
+        return MessageAuthor.parse(author_data)
 
     def set_author(self, author: MessageAuthor, key: Union[str, bytes] = "author"):
         """Sets the author of the message.
@@ -110,41 +112,26 @@ class Message:
         The message author is stored in the 'author' header. Optionally specify a
         non-default `key` to store the author under a different header key.
         """
-
-        header_value = author.encode()
-        self.set_header(key, header_value)
-
-    @staticmethod
-    def _convert_str(value: Union[str, bytes]) -> str:
-        """Converts the given value to a string if needed."""
-
-        if isinstance(value, bytes):
-            return value.decode("ascii")
-
-        return value
-
-    @staticmethod
-    def _convert_bytes(value: Union[str, bytes]) -> bytes:
-        """Converts the given value to bytes if needed."""
-
-        if isinstance(value, str):
-            return value.encode("ascii")
-
-        return value
+        self.set_header(key, author.write())
 
     @classmethod
-    def read_message(
+    def parse(cls, data: bytes) -> "Message":
+        """Parse and return a Message from the given data."""
+        return cls._parse(data)
+
+    @classmethod
+    def _parse(
         cls, data: bytes, start: int = 0, headers: Optional[MessageHeaders] = None
     ) -> "Message":
-        """Read a Git Commit or Tag message's headers and text.
+        """Private implementation of message parsing with additional options.
 
-        Commits and Tag messages are formatted like:
+        Messages are formatted like:
 
         ```
         tree 29ff16c9c14e2652b22f8b78bb08a5a07930c147
         parent 206941306e8a8af65b66eaaaea388a7ae24d49a0
-        author Carlton Duffett <carlton.duffett@gmail.com> 1527025023 -0700
-        committer Carlton Duffett <carlton.duffett@gmail.com> 1527025044 -0700
+        author Carlton Duffett <carlton.duffett@example.com> 1527025023 -0700
+        committer Carlton Duffett <carlton.duffett@example.com> 1527025044 -0700
         gpgsig -----BEGIN PGP SIGNATURE-----
          iQIzBAABCAAdFiEExwXquOM8bWb4Q2zVGxM2FxoLkGQFAlsEjZQACgkQGxM2FxoL
          kGQdcBAAqPP+ln4nGDd2gETXjvOpOxLzIMEw4A9gU6CzWzm+oB8mEIKyaH0UFIPh
@@ -170,9 +157,12 @@ class Message:
 
         A blank line follows the header. The remainder of the message body after the blank line
         is reserved for the message text.
+
+        Messages are expected to be well-formed: parser behavior is undefined for malformed
+        messages.
         """
 
-        if not headers:
+        if headers is None:
             headers = dict()
 
         # Find the next space and newline, deliniating another key-value pair.
@@ -190,17 +180,23 @@ class Message:
         key = data[start:space_index]
 
         # Read the value after that key
-        end = start
+        value_start = space_index + 1
 
         while True:
+            value_end = data.find(b"\n", value_start)
+
             # Continuation lines begin with a space. Continue collecting the value until
-            # we encounter a newline immediately followed by a space.
-            end = data.find(b"\n", end + 1)
-            if data[end + 1] != b" ":
+            # we encounter a newline NOT immediately followed by a space. When comparing
+            # a single byte Python views the characters as ints, rather than bytes.
+            if data[value_end + 1] != ord(" "):
                 break
 
+            # Skip the newline and the space and continue reading the value.
+            value_start = value_end + 2
+
         # Extract the value and drop leading spaces on continuation lines.
-        value = data[space_index + 1 : end].replace(b"\n ", b"\n")
+        # Omit the trailing newline from any values too.
+        value = data[space_index + 1 : value_end].replace(b"\n ", b"\n")
 
         # Keys may appear more than once, so we store them as lists.
         try:
@@ -208,7 +204,7 @@ class Message:
         except KeyError:
             headers[key] = [value]
 
-        return cls.read_message(data, start=end + 1, headers=headers)
+        return cls._parse(data, start=value_end + 1, headers=headers)
 
     def write(self) -> bytes:
         """Write the Message's headers and text to bytes."""
@@ -216,12 +212,30 @@ class Message:
         data = b""
 
         for key, values in self._headers.items():
-            # Lists will be serialized on adjacent lines
             for value in values:
-                # Add the leading spaces back for continuation lines.
+                # Add the leading spaces back for continuation lines, also restore
+                # the trailing newline at the end of a key's value.
                 data += key + b" " + value.replace(b"\n", b"\n ") + b"\n"
 
         # Append message
-        data = data + b"\n" + self._text
+        data = data + b"\n" + self._text + b"\n"
 
         return data
+
+
+def _convert_str(value: Union[str, bytes]) -> str:
+    """Converts the given value to a string if needed."""
+
+    if isinstance(value, bytes):
+        return value.decode()
+
+    return value
+
+
+def _convert_bytes(value: Union[str, bytes]) -> bytes:
+    """Converts the given value to bytes if needed."""
+
+    if isinstance(value, str):
+        return value.encode()
+
+    return value

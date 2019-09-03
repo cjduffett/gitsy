@@ -1,5 +1,7 @@
 """Message model tests."""
 
+from pathlib import Path
+
 import pytest
 
 from wyag.models.message import Message, MessageAuthor, MessageHeaders
@@ -19,6 +21,14 @@ def headers() -> MessageHeaders:
     """Some fake MessageHeaders, for testing."""
 
     return {b"foo": [b"bar"], b"spam": [b"eggs"]}
+
+
+@pytest.fixture
+def commit_message() -> bytes:
+    """A raw commit message, for testing."""
+
+    with Path("tests/fixtures/commit_message").open("rb") as f:
+        return f.read()
 
 
 def test_message_author__read_author():
@@ -153,3 +163,65 @@ def test_message__get_author__malformed():
         message.get_author()
 
     assert str(excinfo.value) == "Message author is malformed!"
+
+
+def test_message__parse(commit_message):
+    """Should correctly parse a well-formed message."""
+
+    message = Message.parse(commit_message)
+
+    assert message._text == b"Initial commit.\n"
+
+    for key in [b"tree", b"parent", b"author", b"committer", b"gpgsig"]:
+        assert key in message._headers
+
+    assert message._headers[b"tree"] == [b"29ff16c9c14e2652b22f8b78bb08a5a07930c147"]
+    assert message._headers[b"parent"] == [b"206941306e8a8af65b66eaaaea388a7ae24d49a0"]
+    assert message._headers[b"author"] == [
+        b"Carlton Duffett <carlton.duffett@example.com> 1527025023 -0700"
+    ]
+    assert message._headers[b"committer"] == [
+        b"Carlton Duffett <carlton.duffett@example.com> 1527025044 -0700"
+    ]
+
+    expected_gpgsig = b"""-----BEGIN PGP SIGNATURE-----
+iQIzBAABCAAdFiEExwXquOM8bWb4Q2zVGxM2FxoLkGQFAlsEjZQACgkQGxM2FxoL
+kGQdcBAAqPP+ln4nGDd2gETXjvOpOxLzIMEw4A9gU6CzWzm+oB8mEIKyaH0UFIPh
+rNUZ1j7/ZGFNeBDtT55LPdPIQw4KKlcf6kC8MPWP3qSu3xHqx12C5zyai2duFZUU
+wqOt9iCFCscFQYqKs3xsHI+ncQb+PGjVZA8+jPw7nrPIkeSXQV2aZb1E68wa2YIL
+3eYgTUKz34cB6tAq9YwHnZpyPx8UJCZGkshpJmgtZ3mCbtQaO17LoihnqPn4UOMr
+V75R/7FjSuPLS8NaZF4wfi52btXMSxO/u7GuoJkzJscP3p4qtwe6Rl9dc1XC8P7k
+NIbGZ5Yg5cEPcfmhgXFOhQZkD0yxcJqBUcoFpnp2vu5XJl2E5I/quIyVxUXi6O6c
+/obspcvace4wy8uO0bdVhc4nJ+Rla4InVSJaUaBeiHTW8kReSFYyMmDCzLjGIu1q
+doU61OM3Zv1ptsLu3gUE6GU27iWYj2RWN3e3HE4Sbd89IFwLXNdSuM0ifDLZk7AQ
+WBhRhipCCgZhkj9g2NEk7jRVslti1NdN5zoQLaJNqSwO1MtxTmJ15Ksk3QP6kfLB
+Q52UWybBzpaP9HEd4XnR+HuQ4k2K0ns2KgNImsNvIyFwbpMUyUWLMPimaV1DWUXo
+5SBjDB/V/W2JBFR+XKHFJeFwYhj7DD/ocsGr4ZMx/lgc8rjIBkI=
+=lgTX
+-----END PGP SIGNATURE-----"""
+
+    assert message._headers[b"gpgsig"] == [expected_gpgsig]
+
+
+def test_message__write(author, headers):
+    """Should correctly serialize the Message as bytes."""
+
+    headers[b"pets"] = [b"cat", b"rabbit", b"dog"]
+    headers[b"haiku"] = [b"O snail\nClimb Mount Fuji,\nBut slowly, slowly!"]
+
+    message = Message("My first commit message!", author=author, headers=headers)
+
+    expected_bytes = b"""foo bar
+spam eggs
+pets cat
+pets rabbit
+pets dog
+haiku O snail
+ Climb Mount Fuji,
+ But slowly, slowly!
+author Michael Scott <mscott@dunder-mifflin.com> 1567452952 +0000
+
+My first commit message!
+"""
+
+    assert message.write() == expected_bytes
