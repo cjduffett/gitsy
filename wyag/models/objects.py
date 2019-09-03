@@ -17,14 +17,14 @@ class Object(ABC):
         self.repo = repo
 
         if data is not None:
-            self.deserialize(data)
+            self.parse(data)
 
     @abstractmethod
-    def deserialize(self, data: bytes):
+    def parse(self, data: bytes):
         """Parse raw object data into object attributes."""
 
     @abstractmethod
-    def serialize(self) -> bytes:
+    def write(self) -> bytes:
         """Write the object as bytes."""
 
 
@@ -34,11 +34,13 @@ class Blob(Object):
     type_ = "blob"
     data: bytes
 
-    def serialize(self) -> bytes:
-        return self.data
-
-    def deserialize(self, data: bytes):
+    def parse(self, data: bytes):
+        """Parse the blob data as-is."""
         self.data = data
+
+    def write(self) -> bytes:
+        """Write the blob data as-is."""
+        return self.data
 
 
 class Commit(Object):
@@ -49,26 +51,44 @@ class Commit(Object):
     # The author of the commit.
     author: MessageAuthor
 
+    # The person who committed of the commit.
+    committer: MessageAuthor
+
     # The commit message text.
     message: str
 
     # The full SHA-1 hash of the worktree's root tree.
     tree_sha: str
 
-    def deserialize(self, data: bytes):
+    # The full SHA-1 hash of the commit's parent, if any.
+    parent_sha: Optional[str]
+
+    def parse(self, data: bytes):
         """Parse the Commit from a Message."""
 
-        message = Message.read_message(data)
+        message = Message.parse(data)
+
+        try:
+            self.parent_sha = message.get_header("parent")
+        except Exception:  # pylint: disable=broad-except
+            self.parent_sha = None
 
         self.tree_sha = message.get_header("tree")
         self.author = message.get_author()
+        self.committer = message.get_author(key="committer")
         self.message = message.get_text()
 
-    def serialize(self) -> bytes:
+    def write(self) -> bytes:
         """Create a Message from the Commit and write that Message to bytes."""
 
-        message = Message(author=self.author, text=self.message)
+        message = Message(text=self.message)
         message.set_header("tree", self.tree_sha)
+
+        if self.parent_sha:
+            message.set_header("parent", self.parent_sha)
+
+        message.set_author(self.author)
+        message.set_author(self.committer, key="committer")
         return message.write()
 
 
@@ -103,26 +123,24 @@ class Tag(Object):
     # The type of object this tag refers to.
     obj_type: str
 
-    def deserialize(self, data: bytes):
+    def parse(self, data: bytes):
         """Parse the Tag from a Message."""
 
-        message = Message.read_message(data)
-
-        self.author = message.get_author(key="tagger")
-        self.message = message.get_text()
+        message = Message.parse(data)
         self.obj_sha = message.get_header("object")
         self.obj_type = message.get_header("type")
         self.name = message.get_header("tag")
+        self.author = message.get_author(key="tagger")
+        self.message = message.get_text()
 
-    def serialize(self) -> bytes:
+    def write(self) -> bytes:
         """Create a Message from the Tag and write that message to bytes."""
 
         message = Message(text=self.message)
-        message.set_author(self.author, key="tagger")
         message.set_header("object", self.obj_sha)
         message.set_header("type", self.obj_type)
         message.set_header("tag", self.name)
-
+        message.set_author(self.author, key="tagger")
         return message.write()
 
 
@@ -149,10 +167,10 @@ class Tree(Object):
     type_ = "tree"
     nodes: List[TreeNode]
 
-    def deserialize(self, data: bytes):
+    def parse(self, data: bytes):
         self.nodes = self._read_nodes(data)
 
-    def serialize(self) -> bytes:
+    def write(self) -> bytes:
         return self._write_nodes()
 
     @classmethod
