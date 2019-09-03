@@ -1,7 +1,5 @@
 """Message model tests."""
 
-from pathlib import Path
-
 import pytest
 
 from wyag.models.message import Message, MessageAuthor, MessageHeaders
@@ -21,14 +19,6 @@ def headers() -> MessageHeaders:
     """Some fake MessageHeaders, for testing."""
 
     return {b"foo": [b"bar"], b"spam": [b"eggs"]}
-
-
-@pytest.fixture
-def commit_message() -> bytes:
-    """A raw commit message, for testing."""
-
-    with Path("tests/fixtures/commit_message").open("rb") as f:
-        return f.read()
 
 
 def test_message_author__read_author():
@@ -165,12 +155,10 @@ def test_message__get_author__malformed():
     assert str(excinfo.value) == "Message author is malformed!"
 
 
-def test_message__parse(commit_message):
+def test_message__parse(signed_commit_message):
     """Should correctly parse a well-formed message."""
 
-    message = Message.parse(commit_message)
-
-    assert message._text == b"Initial commit.\n"
+    message = Message.parse(signed_commit_message)
 
     for key in [b"tree", b"parent", b"author", b"committer", b"gpgsig"]:
         assert key in message._headers
@@ -201,6 +189,7 @@ Q52UWybBzpaP9HEd4XnR+HuQ4k2K0ns2KgNImsNvIyFwbpMUyUWLMPimaV1DWUXo
 -----END PGP SIGNATURE-----"""
 
     assert message._headers[b"gpgsig"] == [expected_gpgsig]
+    assert message._text == b"Enable https for nginx.\n"
 
 
 def test_message__write(author, headers):
@@ -221,7 +210,6 @@ haiku O snail
  But slowly, slowly!
 author Michael Scott <mscott@dunder-mifflin.com> 1567452952 +0000
 
-My first commit message!
-"""
+My first commit message!"""
 
     assert message.write() == expected_bytes
