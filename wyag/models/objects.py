@@ -108,8 +108,8 @@ class Tag(Object):
 
     type_ = "tag"
 
-    # The author of the tag.
-    author: MessageAuthor
+    # The creator of the tag.
+    tagger: MessageAuthor
 
     # The tag message text.
     message: str
@@ -130,7 +130,7 @@ class Tag(Object):
         self.obj_sha = message.get_header("object")
         self.obj_type = message.get_header("type")
         self.name = message.get_header("tag")
-        self.author = message.get_author(key="tagger")
+        self.tagger = message.get_author(key="tagger")
         self.message = message.get_text()
 
     def write(self) -> bytes:
@@ -140,7 +140,7 @@ class Tag(Object):
         message.set_header("object", self.obj_sha)
         message.set_header("type", self.obj_type)
         message.set_header("tag", self.name)
-        message.set_author(self.author, key="tagger")
+        message.set_author(self.tagger, key="tagger")
         return message.write()
 
 
