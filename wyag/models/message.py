@@ -218,7 +218,7 @@ class Message:
                 data += key + b" " + value.replace(b"\n", b"\n ") + b"\n"
 
         # Append message
-        data = data + b"\n" + self._text + b"\n"
+        data = data + b"\n" + self._text
 
         return data
 
