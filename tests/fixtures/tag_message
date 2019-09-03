@@ -1,0 +1,6 @@
+object b6a7fad7ec645c74f26dfe5b28fc73c29d6c7182
+type commit
+tag 1.0.2
+tagger Carlton Duffett <carlton.duffett@example.com> 1567444360 -0700
+
+Release version 1.0.2, see changelog for details.

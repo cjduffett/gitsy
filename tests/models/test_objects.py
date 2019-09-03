@@ -54,7 +54,7 @@ def test_commit__parse(repo, commit_message):
 
 
 def test_commit__parse__initial(repo, initial_commit_message):
-    """Should correctly parse a Commit object from an initial commit, without a parent."""
+    """Should correctly parse a Commit object from an initial commit (no parent)."""
 
     commit = objects.Commit(repo, initial_commit_message)
 
@@ -81,9 +81,31 @@ def test_commit__write(repo, commit_message):
     assert commit.write() == commit_message
 
 
-def test_tag__parse(repo):
+def test_commit__write__initial(repo, initial_commit_message):
+    """Should correctly serialize an initial Commit object to bytes (no parent)."""
+
+    commit = objects.Commit(repo, initial_commit_message)
+    assert commit.write() == initial_commit_message
+
+
+def test_tag__parse(repo, tag_message):
     """Should correctly parse a Tag object from bytes."""
 
+    tag = objects.Tag(repo, tag_message)
 
-def test_tag__write(repo):
+    assert tag.type_ == "tag"
+    assert tag.message == "Release version 1.0.2, see changelog for details.\n"
+    assert tag.obj_type == "commit"
+    assert tag.obj_sha == "b6a7fad7ec645c74f26dfe5b28fc73c29d6c7182"
+
+    assert tag.tagger.name == "Carlton Duffett"
+    assert tag.tagger.email == "carlton.duffett@example.com"
+    assert tag.tagger.authored_at == 1567444360
+    assert tag.tagger.timezone == "-0700"
+
+
+def test_tag__write(repo, tag_message):
     """Should correctly serialize a Tag object to bytes."""
+
+    tag = objects.Tag(repo, tag_message)
+    assert tag.write() == tag_message

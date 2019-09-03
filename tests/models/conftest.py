@@ -27,3 +27,11 @@ def signed_commit_message() -> bytes:
 
     with Path("tests/fixtures/signed_commit_message").open("rb") as f:
         return f.read()
+
+
+@pytest.fixture
+def tag_message() -> bytes:
+    """A raw tag message, for testing."""
+
+    with Path("tests/fixtures/tag_message").open("rb") as f:
+        return f.read()
