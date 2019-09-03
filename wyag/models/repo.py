@@ -40,7 +40,7 @@ class Repository:
         config_exists = self.config_file.exists()
 
         if not config_exists and not self._force:
-            raise Exception("Configuration file missing")
+            raise Exception("Configuration file missing!")
 
         if config_exists:
             with self.config_file.open() as f:
@@ -68,7 +68,7 @@ class Repository:
             file_path.touch()
 
         if not file_path.exists():
-            raise Exception(f"File {file_path} does not exist!")
+            raise Exception(f"{file_path} does not exist!")
 
         return file_path
 
@@ -80,8 +80,8 @@ class Repository:
 
         dir_path = self.gitdir / dir_name
 
-        if mkdir and not dir_path.exists():
-            dir_path.mkdir(parents=True)
+        if mkdir:
+            dir_path.mkdir(parents=True, exist_ok=True)
 
         if not dir_path.is_dir():
             raise Exception(f"{dir_path} is not a directory!")
