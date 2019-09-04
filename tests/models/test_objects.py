@@ -5,6 +5,8 @@ import pytest
 from wyag.models import objects
 from wyag.models.repo import Repository
 
+# TODO: Test Tree and TreeNode models
+
 
 @pytest.fixture
 def repo() -> Repository:
