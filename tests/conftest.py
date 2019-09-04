@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+from gitsy.models.repo import Repository
 from gitsy.services.repo import init_repo
 
 
@@ -25,4 +26,10 @@ def worktree(empty_worktree):
     assert new_repo.gitdir.exists()
     assert new_repo.config_file.exists()
 
-    yield empty_worktree
+    return empty_worktree
+
+
+@pytest.fixture
+def repo(worktree) -> Repository:
+    """Creates an empty Repository, for testing."""
+    return Repository(worktree)

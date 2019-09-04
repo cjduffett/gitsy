@@ -1,18 +1,8 @@
 """Git object model tests."""
 
-import pytest
-
 from gitsy.models import objects
-from gitsy.models.repo import Repository
 
 # TODO: Test Tree and TreeNode models
-
-
-@pytest.fixture
-def repo(worktree) -> Repository:
-    """Return a fake Repository, for testing."""
-
-    return Repository(worktree)
 
 
 def test_blob__parse(repo):
