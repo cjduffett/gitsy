@@ -36,7 +36,7 @@ def _checkout_tree(repo: Repository, tree: objects.Tree, path: Union[Path, str])
 
     for node in tree.nodes:
         node_obj = read_object(repo, node.sha)
-        dest = Path(path) / str(node.path, encoding="ascii")
+        dest = Path(path) / str(node.path)
 
         if node_obj.type_ == "tree":
             dest.mkdir(parents=True)
@@ -57,9 +57,9 @@ def ls_tree(repo: Repository, tree_sha: str) -> None:
 
     for node in tree.nodes:
         # Left pad with zeros to always display a 6-digit file mode
-        display_mode = "0" * (6 - len(node.mode)) + node.mode.decode("ascii")
+        display_mode = "0" * (6 - len(node.mode)) + str(node.mode)
 
         # Read the object referenced by this node
         node_obj = read_object(repo, node.sha)
 
-        print(f"{display_mode} {node_obj.type_} {node.sha} {node.path.decode('ascii')}")
+        print(f"{display_mode} {node_obj.type_} {node.sha} {str(node.path)}")
