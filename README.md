@@ -1,4 +1,4 @@
-# gitsy - Write Yourself a Git!
+# gitsy - The Wannabe Git Clone
 
 ## Prerequisites
 
