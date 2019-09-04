@@ -126,26 +126,40 @@ def show_ref():
 
 
 @click.command()
-@click.argument("name", default="HEAD")
-@click.argument("obj_sha", required=False)
-@click.option("-a", "create_tag_obj", is_flag=True, help="Create a tag object.")
-def tag(name, obj_sha, create_tag_obj):
-    """List tags or create a new tag with the specified NAME.
+@click.argument("name", required=False)
+@click.argument("obj_sha", default="HEAD")
+@click.option("-a", "--annotate", is_flag=True, help="Create an unsigned, annotated tag object.")
+@click.option("-m", "--message", help="Tag message.")
+@click.option("-d", "--delete", is_flag=True, help="Delete an existing tag")
+def tag(name, obj_sha, annotate, message, delete):
+    """Create, list, and manage tags.
 
-    Optionally specify an OBJECT the new tag will point to.
+    Optionally specify an OBJECT the new tag will point to. If no OBJECT is provided,
+    defaults to 'HEAD'.
     """
 
-    repo = services.repo.find_repo(required=create_tag_obj)
+    if annotate and delete:
+        raise click.BadOptionUsage(
+            "-d", "Tag annotation (-a) and deletion (-d) are mutually exclusive options."
+        )
 
-    if name:
-        # Create a new tag with the specified NAME
-        tag_type = "object" if create_tag_obj else "ref"
-        services.tags.create_tag(name, obj_sha, tag_type)
+    if annotate and not message:
+        raise click.BadOptionUsage("-a", "Tag annotation requires a message (-m).")
 
-    else:
+    repo = services.repo.find_repo(required=annotate)
+
+    if not name:
         # List tags
         refs = services.refs.list_refs(repo)
-        services.refs.show_refs(refs["tags"], show_hash=False)
+        services.refs.show_refs(refs.get("tags", {}))
+
+    if name or annotate:
+        # Create a new tag with the specified NAME
+        services.tags.create_tag(name, obj_sha, annotate, message)
+
+    if delete:
+        sha = services.refs.delete_ref(repo, name)
+        print(f"Deleted tag {name!r}, was {sha}")
 
 
 @click.command()
