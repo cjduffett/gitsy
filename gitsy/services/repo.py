@@ -18,7 +18,7 @@ def init_repo(path: str) -> Repository:
         # Initialize a new directory for the worktree if none exists
         repo.worktree.mkdir(parents=True)  # mkdir -p
     else:
-        # If there's already a directory or file in .wyag, abort
+        # If there's already a directory or file in .gitsy, abort
         if not repo.worktree.is_dir():
             raise Exception(f"{repo.worktree} is not a directory!")
 

@@ -1,4 +1,4 @@
-"""Wyag CLI entrypoint and commands."""
+"""gitsy CLI entrypoint and commands."""
 
 import sys
 
@@ -11,7 +11,7 @@ OBJECT_TYPE_CHOICES = ["blob", "commit", "tag", "tree"]
 
 
 @click.group()
-def wyag():
+def gitsy():
     """The stupid content tracker."""
 
     sys.tracebacklimit = 0  # Disable error tracebacks
@@ -169,14 +169,14 @@ def version():
 
 
 # Add all of the subcommands to the main group
-wyag.add_command(cat_file)
-wyag.add_command(checkout)
-wyag.add_command(commit)
-wyag.add_command(hash_object)
-wyag.add_command(init)
-wyag.add_command(log)
-wyag.add_command(ls_tree)
-wyag.add_command(rev_parse)
-wyag.add_command(show_ref)
-wyag.add_command(tag)
-wyag.add_command(version)
+gitsy.add_command(cat_file)
+gitsy.add_command(checkout)
+gitsy.add_command(commit)
+gitsy.add_command(hash_object)
+gitsy.add_command(init)
+gitsy.add_command(log)
+gitsy.add_command(ls_tree)
+gitsy.add_command(rev_parse)
+gitsy.add_command(show_ref)
+gitsy.add_command(tag)
+gitsy.add_command(version)

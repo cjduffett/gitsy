@@ -2,7 +2,7 @@
 
 import pytest
 
-from wyag.models.message import Message, MessageAuthor, MessageHeaders
+from gitsy.models.message import Message, MessageAuthor, MessageHeaders
 
 
 @pytest.fixture

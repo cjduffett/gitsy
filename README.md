@@ -1,4 +1,4 @@
-# WYAG - Write Yourself a Git!
+# gitsy - Write Yourself a Git!
 
 ## Prerequisites
 
@@ -16,16 +16,16 @@ Create a Python virtual environment in your local project directory, using `poet
 make .venv
 ```
 
-To run the `wyag` script activate the virtual environment:
+To run the `gitsy` script activate the virtual environment:
 
 ```
 source ./.venv/bin/activate
 ```
 
-And run `wyag`:
+And run `gitsy`:
 
 ```
-(.venv): wyag version
+(.venv): gitsy version
 ```
 
 ## VSCode Settings

@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from wyag.models.repo import Repository
-from wyag.services.repo import init_repo
+from gitsy.models.repo import Repository
+from gitsy.services.repo import init_repo
 
 
 @pytest.fixture

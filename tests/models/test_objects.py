@@ -2,8 +2,8 @@
 
 import pytest
 
-from wyag.models import objects
-from wyag.models.repo import Repository
+from gitsy.models import objects
+from gitsy.models.repo import Repository
 
 # TODO: Test Tree and TreeNode models
 
