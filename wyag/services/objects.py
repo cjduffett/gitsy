@@ -92,24 +92,23 @@ def hash_object(
     return write_object(obj, write=write)
 
 
-def resolve_object(repo: Repository, name: str) -> List[str]:
-    """Resolves the name of a Git Object to its full SHA-1 hash.
-
-    This method is aware of:
-    - The HEAD literal
-    - Short and long hashes
-    - Tags
-    - Branches
-    - Remote branches
-    """
+def resolve_object(repo: Repository, name: str) -> str:
+    """Resolves the name of a Git Object to its full SHA-1 hash."""
 
     candidates: List[str] = list()
-    LONG_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{1,16}$")
-    SHORT_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{1,16}$")
 
-    # Abort if empty string
-    if not name.strip():
-        raise Exception("No name given!")
+    # Anything with more than 16 characters is considered a "long" hash.
+    # Full length SHA-1 hashes are 40 characters long.
+    LONG_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{16,40}$")
+
+    # The minimum length for a "short" hash references is 4 characters.
+    # Anything sorter is too likely to be ambiguous.
+    SHORT_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{4,16}$")
+
+    name = name.strip()
+
+    if not name:
+        raise Exception("No name to resolve!")
 
     if name == "HEAD":
         return [resolve_ref(repo, "HEAD")]
@@ -120,16 +119,15 @@ def resolve_object(repo: Repository, name: str) -> List[str]:
             return [name.lower()]
 
     if SHORT_HASH_REGEX.match(name):
-        if len(name) >= 4:
-            # This is a short hash. The minimum length for short hash references is 4 characters.
-            name = name.lower()
-            prefix = name[0:2]
-            path = repo.repo_dir("objects", mkdir=False) / prefix
+        # This is a short hash.
+        name = name.lower()
+        prefix = name[0:2]
+        path = repo.repo_dir("objects", mkdir=False) / prefix
 
-            rest = name[2:]
-            for file_ in path.iterdir():
-                if file_.name.startswith(rest):
-                    candidates.append(prefix + file_.name)
+        rest = name[2:]
+        for file_ in path.iterdir():
+            if file_.name.startswith(rest):
+                candidates.append(prefix + file_.name)
 
     return candidates
 
@@ -166,7 +164,7 @@ def find_object(
         # Follow tags
         if obj.type_ == "tag":
             tag = cast(objects.Tag, obj)
-            sha = tag.object_sha
+            sha = tag.obj_sha
 
         elif obj.type_ == "commit" and obj_type == "tree":
             commit = cast(objects.Commit, obj)
