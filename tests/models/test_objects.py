@@ -9,10 +9,10 @@ from gitsy.models.repo import Repository
 
 
 @pytest.fixture
-def repo() -> Repository:
+def repo(worktree) -> Repository:
     """Return a fake Repository, for testing."""
 
-    return Repository(".", force=True)
+    return Repository(worktree)
 
 
 def test_blob__parse(repo):
