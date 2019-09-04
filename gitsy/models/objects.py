@@ -70,7 +70,7 @@ class Commit(Object):
 
         try:
             self.parent_sha = message.get_header("parent")
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             self.parent_sha = None
 
         self.tree_sha = message.get_header("tree")
