@@ -4,7 +4,7 @@ import hashlib
 import re
 import zlib
 from pathlib import Path
-from typing import List, Optional, Type, cast
+from typing import List, Optional, Tuple, Type, cast
 
 from ..models import objects
 from ..models.repo import Repository
@@ -17,8 +17,8 @@ def read_object(repo: Repository, sha: str, obj_type: Optional[str] = None) -> o
     Optionall specify `obj_type` to validate that the retrieved object is of the given type.
     """
 
-    obj_path = Path("objects") / sha[0:2] / sha[2:]
-    obj_file = repo.repo_file(obj_path)
+    obj_dir = repo.repo_dir("objects", mkdir=True)
+    obj_file = obj_dir / sha[0:2] / sha[2:]
 
     if not obj_file.exists():
         raise Exception(f"Object {sha} does not exist!")
@@ -26,37 +26,48 @@ def read_object(repo: Repository, sha: str, obj_type: Optional[str] = None) -> o
     with obj_file.open("rb") as f:
         raw_data = zlib.decompress(f.read())
 
-    # Read object type
-    space_index = raw_data.find(b" ")
-    found_obj_type = raw_data[0:space_index].decode("utf-8")
+    try:
+        parsed_obj_type, obj_size, obj_data = _parse_object(raw_data)
+    except Exception:
+        raise Exception(f"Malformed object {sha}: cannot parse")
 
-    if obj_type and found_obj_type != obj_type:
+    if obj_type and parsed_obj_type != obj_type:
         raise Exception(f"Object {sha} is not of type {obj_type!r}!")
 
-    # Read and validate object size
-    null_index = raw_data.find(b"\x00")
-    obj_size = raw_data[space_index:null_index].decode("utf-8")
-
-    if int(obj_size) != len(raw_data) - null_index - 1:
+    if obj_size != len(obj_data):
         raise Exception(f"Malformed object {sha}: bad length")
 
-    obj_data = raw_data[null_index + 1 :]
-    obj_class = _get_object_class(found_obj_type)
+    obj_class = _get_object_class(parsed_obj_type)
     return obj_class(repo, obj_data)
 
 
-def cat_object(repo: Repository, sha: str, obj_type: str) -> None:
+def _parse_object(data: bytes) -> Tuple[str, int, bytes]:
+    """Parses a raw comporessed object, returning it's (type, size, data)."""
+
+    # Read object type
+    space_index = data.find(b" ")
+    obj_type = str(data[0:space_index], "utf-8")
+
+    # Read and validate object size
+    null_index = data.find(b"\x00")
+    obj_size = str(data[space_index:null_index], "utf-8")
+    obj_data = data[null_index + 1 :]
+
+    return obj_type, int(obj_size), obj_data
+
+
+def cat_object(repo: Repository, name: str, obj_type: str) -> None:
     """Display the given object of the specified type."""
 
-    full_sha = resolve_object(repo, name=sha, obj_type=obj_type)[0]
-    obj = read_object(repo, full_sha, obj_type=obj_type)
-    print(obj.serialize())
+    full_sha = resolve_object(repo, name=name)
+    obj = read_object(repo, sha=full_sha, obj_type=obj_type)
+    print(obj.write())
 
 
-def write_object(obj: objects.Object, write: bool = True) -> str:
+def write_object(repo, obj: objects.Object, write: bool = True) -> str:
     """Serialize object data and generate a new SHA-1 hash of that object."""
 
-    obj_data = obj.serialize()
+    obj_data = obj.write()
 
     # Add the header, format: "<obj_type> <checksum>\x00<obj_data>"
     raw_data = obj.type_.encode() + b" " + str(len(obj_data)).encode() + b"\x00" + obj_data
@@ -65,8 +76,9 @@ def write_object(obj: objects.Object, write: bool = True) -> str:
     sha = hashlib.sha1(raw_data).hexdigest()
 
     if write:
-        obj_path = Path("objects") / sha[0:2] / sha[2:]
-        obj_file = obj.repo.repo_file(obj_path, touch=True)
+        obj_dir = repo.repo_dir("objects", mkdir=True)
+        obj_path = obj_dir / sha[0:2] / sha[2:]
+        obj_file = repo.repo_file(obj_path, touch=True)
         obj_file.write_bytes(zlib.compress(raw_data))
 
     return sha
@@ -95,41 +107,43 @@ def hash_object(
 def resolve_object(repo: Repository, name: str) -> str:
     """Resolves the name of a Git Object to its full SHA-1 hash."""
 
-    candidates: List[str] = list()
+    return name
 
-    # Anything with more than 16 characters is considered a "long" hash.
-    # Full length SHA-1 hashes are 40 characters long.
-    LONG_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{16,40}$")
+    # candidates: List[str] = list()
 
-    # The minimum length for a "short" hash references is 4 characters.
-    # Anything sorter is too likely to be ambiguous.
-    SHORT_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{4,16}$")
+    # # Anything with more than 16 characters is considered a "long" hash.
+    # # Full length SHA-1 hashes are 40 characters long.
+    # LONG_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{16,40}$")
 
-    name = name.strip()
+    # # The minimum length for a "short" hash references is 4 characters.
+    # # Anything sorter is too likely to be ambiguous.
+    # SHORT_HASH_REGEX = re.compile(r"^[0-9A-Fa-f]{4,16}$")
 
-    if not name:
-        raise Exception("No name to resolve!")
+    # name = name.strip()
 
-    if name == "HEAD":
-        return [resolve_ref(repo, "HEAD")]
+    # if not name:
+    #     raise Exception("No name to resolve!")
 
-    if LONG_HASH_REGEX.match(name):
-        if len(name) == 40:
-            # This is a complete hash
-            return [name.lower()]
+    # if name == "HEAD":
+    #     return [resolve_ref(repo, "HEAD")]
 
-    if SHORT_HASH_REGEX.match(name):
-        # This is a short hash.
-        name = name.lower()
-        prefix = name[0:2]
-        path = repo.repo_dir("objects", mkdir=False) / prefix
+    # if LONG_HASH_REGEX.match(name):
+    #     if len(name) == 40:
+    #         # This is a complete hash
+    #         return [name.lower()]
 
-        rest = name[2:]
-        for file_ in path.iterdir():
-            if file_.name.startswith(rest):
-                candidates.append(prefix + file_.name)
+    # if SHORT_HASH_REGEX.match(name):
+    #     # This is a short hash.
+    #     name = name.lower()
+    #     prefix = name[0:2]
+    #     path = repo.repo_dir("objects", mkdir=False) / prefix
 
-    return candidates
+    #     rest = name[2:]
+    #     for file_ in path.iterdir():
+    #         if file_.name.startswith(rest):
+    #             candidates.append(prefix + file_.name)
+
+    # return candidates
 
 
 def find_object(
