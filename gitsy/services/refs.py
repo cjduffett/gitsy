@@ -62,6 +62,7 @@ def list_refs(repo: Repository, path: Optional[Union[Path, str]] = None) -> Refe
     refs = {
         "heads": {
             "master": "174acae109186ba66c5e7638cd68f9779dee6694",
+            "dev": "96e86353078f58a63e9d0dbd5beadc23e76a918f",
             "feature": {
                 "my-branch": "8c67749d6b047996146f8f71fd7b2d1a12b9b0ba",
             },
@@ -70,7 +71,7 @@ def list_refs(repo: Repository, path: Optional[Union[Path, str]] = None) -> Refe
             "1.1.0": "HEAD",
             "1.0.0": "5e880e8919d623ab8f981ac8b698a1b8fa137db8",
             "beta": {
-                "2.0.0a": "1c1f34386c8ee3a31bcbd45bd14c55702ea07adb",
+                "2.0.0a1": "1c1f34386c8ee3a31bcbd45bd14c55702ea07adb",
             },
         },
         ...
@@ -106,8 +107,10 @@ def resolve_ref(repo: Repository, name: str) -> str:
 
     ref_file = repo.repo_file(name)
 
-    with ref_file.open("r") as f:
-        data = f.readline()[:-1]  # Drop final newline
+    if not ref_file.exists():
+        raise Exception(f"Ref {name} does not exist!")
+
+    data = ref_file.read_text().strip("\n")
 
     if data.startswith("ref: "):
         return resolve_ref(repo, data[5:])  # Indirect reference
