@@ -42,7 +42,8 @@ def init_repo(path: str) -> Repository:
         repo.default_config.write(f)
 
     # Create the 'refs' and 'objects' directories
-    repo.repo_dir("refs", mkdir=True)
+    repo.repo_dir("refs/heads", mkdir=True)
+    repo.repo_dir("refs/tags", mkdir=True)
     repo.repo_dir("objects", mkdir=True)
 
     print(f"Initialized empty git repository in {repo.worktree}")

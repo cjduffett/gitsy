@@ -14,7 +14,7 @@ def create_ref(
     ref: Optional[str] = None,
     sha: Optional[str] = None,
     force: bool = False,
-):
+) -> None:
     """Creates a new reference in `.git/refs/`.
 
     If `force = True`, overwrite the existing ref if there is one.
@@ -33,15 +33,14 @@ def create_ref(
     else:
         raise ValueError("Specify only one of 'ref', 'sha'!")
 
-    ref_dir = repo.repo_dir("refs", mkdir=True)
+    ref_dir = repo.repo_dir("refs")
     new_ref = ref_dir / name
 
     if not force:
         if new_ref.exists():
             raise Exception(f"Ref {new_ref} already exists!")
 
-    with new_ref.open("wb") as f:
-        f.write(data)
+    new_ref.write_bytes(data)
 
 
 def delete_ref(repo: Repository, name: str) -> str:
@@ -49,7 +48,7 @@ def delete_ref(repo: Repository, name: str) -> str:
 
     sha = resolve_ref(repo, name)
 
-    ref_file = repo.repo_dir("refs", mkdir=True) / name
+    ref_file = repo.repo_dir("refs") / name
     ref_file.unlink()
 
     return sha
@@ -79,7 +78,7 @@ def list_refs(repo: Repository, path: Optional[Union[Path, str]] = None) -> Refe
     """
 
     if not path:
-        ref_dir = repo.repo_dir("refs", mkdir=True)
+        ref_dir = repo.repo_dir("refs")
     else:
         ref_dir = Path(path)
 
@@ -113,9 +112,11 @@ def resolve_ref(repo: Repository, name: str) -> str:
     data = ref_file.read_text().strip("\n")
 
     if data.startswith("ref: "):
-        return resolve_ref(repo, data[5:])  # Indirect reference
+        # Indirect reference, format: "ref: path/to/ref"
+        return resolve_ref(repo, data[5:])
 
-    return data  # Direct reference to an Object hash
+    # Direct reference to an Object hash
+    return data
 
 
 def show_refs(refs: References, show_hash: bool = True, prefix: str = "") -> None:
