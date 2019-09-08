@@ -27,21 +27,23 @@ def init_repo(path: str) -> Repository:
 
     # .git/description
     description_file = repo.repo_file("description", touch=True)
-
-    with description_file.open("w") as f:
-        f.write("Unnamed repository; edit this file 'description' to name the repository.\n")
+    description_file.write_text(
+        "Unnamed repository; edit this file 'description' to name the repository.\n"
+    )
 
     # .git/HEAD
     head_file = repo.repo_file("HEAD", touch=True)
-
-    with head_file.open("w") as f:
-        f.write("ref: refs/heads/master\n")
+    head_file.write_text("ref: refs/heads/master\n")
 
     # .git/config
     config_file = repo.repo_file("config", touch=True)
 
     with config_file.open("w") as f:
         repo.default_config.write(f)
+
+    # Create the 'refs' and 'objects' directories
+    repo.repo_dir("refs", mkdir=True)
+    repo.repo_dir("objects", mkdir=True)
 
     print(f"Initialized empty git repository in {repo.worktree}")
 
