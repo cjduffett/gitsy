@@ -6,6 +6,7 @@ import pytest
 
 from gitsy.models import objects
 from gitsy.services import objects as services
+from gitsy.services.refs import create_ref
 
 
 def test_read_object__ok(repo):
@@ -168,28 +169,111 @@ def test_write_object__tree():
     # TODO: Test writing Trees
 
 
-def test_hash_object__not_found():
-    pass
+def test_hash_object__not_found(repo):
+    """Should raise an Exception if the file to hash does not exist."""
+
+    with pytest.raises(Exception) as excinfo:
+        services.hash_object(repo, "xmaslist.csv")
+
+    assert str(excinfo.value) == f"File {repo.worktree}/xmaslist.csv does not exist!"
 
 
-def test_hash_object__full_sha():
-    pass
+def test_hash_object__invalid_object_type(repo):
+    """Should raise an Exception if an invalid object type is passed."""
+
+    test_file = repo.worktree / "arnold.txt"
+    test_file.write_text("Get to the chopper!")
+
+    with pytest.raises(Exception) as excinfo:
+        services.hash_object(repo, "arnold.txt", obj_type="foo")
+
+    assert str(excinfo.value) == "Invalid object type 'foo'"
 
 
-def test_resolve_oblect__full_sha():
-    pass
+def test_hash_object__ok(repo):
+    """Should return the full SHA-1 hash of the given file."""
+
+    test_file = repo.worktree / "arnold.txt"
+    test_file.write_text("Get to the chopper!")
+
+    sha = services.hash_object(repo, "arnold.txt")
+    assert sha == "75c5afea064fbb0072efd4049c88d625751ceec1"
 
 
-def test_resolve_oblect__short_sha():
-    pass
+def test_resolve_object_name__full_sha(repo):
+    """Should return the object's full SHA-1 hash as-is."""
+
+    obj = objects.Blob(repo, b"I am a banana")
+    sha = services.write_object(repo, obj)
+
+    got_sha = services.resolve_object_name(repo, name=sha)
+    assert got_sha == "8ff79d2828b3af736abc66a922b2c48fed82d803"
 
 
-def test_resolve_oblect__head():
-    pass
+def test_resolve_object_name__short_sha(repo):
+    """
+    Should return the object's full SHA-1 hash given at least 4 leading characters of the full SHA.
+    """
+
+    obj = objects.Blob(repo, b"I am a banana")
+
+    # 8ff79d2828b3af736abc66a922b2c48fed82d803
+    sha = services.write_object(repo, obj)
+
+    for name in [
+        "8ff7",
+        "8ff79",
+        "8ff79d2828b3a",
+        "8ff79d2828b3af736abc66a",
+        "8ff79d2828b3af736abc66a922b2c48f",
+    ]:
+        assert services.resolve_object_name(repo, name=name) == sha
 
 
-def test_resolve_object__ref():
-    pass
+def test_resolve_object_name__head(repo):
+    """Should resolve the special 'HEAD' reference to the SHA-1 hash it points to."""
+
+    head_ref = repo.repo_file("refs/heads/master", touch=True)
+    head_ref.write_bytes(b"0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
+
+    sha = services.resolve_object_name(repo, name="HEAD")
+    assert sha == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+
+
+def test_resolve_object_name__no_name(mocker):
+    """Should raise an Exception if no name is provided."""
+
+    with pytest.raises(Exception) as excinfo:
+        services.resolve_object_name(mocker.sentinel.Repo, name="")
+
+    assert str(excinfo.value) == "No name to resolve!"
+
+
+def test_resolve_object_name__no_results(repo):
+    """Should raise an Exception if no results are found."""
+
+    with pytest.raises(Exception) as excinfo:
+        services.resolve_object_name(repo, name="96e863530")
+
+    assert str(excinfo.value) == "No such object 96e863530"
+
+
+def test_resolve_object_name__ambiguous(repo):
+    """Should raise an Exception if multiple results are found."""
+
+    repo.repo_file("objects/96/e86353078f58a63e9d0dbd5beadc23e76a918f", touch=True)
+    repo.repo_file("objects/96/e86b5662a3620b3ac4751251eec239d71dd120", touch=True)
+
+    with pytest.raises(Exception) as excinfo:
+        services.resolve_object_name(repo, name="96e86")
+
+    assert (
+        str(excinfo.value)
+        == """Ambiguous object name '96e86', candidates are:
+ - 96e86b5662a3620b3ac4751251eec239d71dd120
+ - 96e86353078f58a63e9d0dbd5beadc23e76a918f
+"""
+    )
 
 
 def test_find_object__no_results():
