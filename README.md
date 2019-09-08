@@ -1,4 +1,4 @@
-# gitsy - The Wannabe Git Clone
+# gitsy - A Cute Git Clone
 
 ## Prerequisites
 
@@ -36,4 +36,14 @@ To run the `gitsy` test suite, run [pytest](https://pytest.org/en/latest/) from 
 ```
 
 This will discover and execute all tests in the `tests/` directory.
+
+## TODO
+
+This is a more a note to myself than anything, but lots to do here still:
+- Implement tag model CRUD
+- Implement commit model CRUD
+- Debug Tree and TreeNode models and implement tree model CRUD
+- Implement staging area and index file, `add` and `rm` commands
+- Implement `merge` command
+- Implement `branch` command
 
