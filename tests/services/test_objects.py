@@ -6,7 +6,6 @@ import pytest
 
 from gitsy.models import objects
 from gitsy.services import objects as services
-from gitsy.services.refs import create_ref
 
 
 def test_read_object__ok(repo):
@@ -230,16 +229,6 @@ def test_resolve_object_name__short_sha(repo):
         assert services.resolve_object_name(repo, name=name) == sha
 
 
-def test_resolve_object_name__head(repo):
-    """Should resolve the special 'HEAD' reference to the SHA-1 hash it points to."""
-
-    head_ref = repo.repo_file("refs/heads/master", touch=True)
-    head_ref.write_bytes(b"0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
-
-    sha = services.resolve_object_name(repo, name="HEAD")
-    assert sha == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
-
-
 def test_resolve_object_name__no_name(mocker):
     """Should raise an Exception if no name is provided."""
 
@@ -249,13 +238,23 @@ def test_resolve_object_name__no_name(mocker):
     assert str(excinfo.value) == "No name to resolve!"
 
 
-def test_resolve_object_name__no_results(repo):
+@pytest.mark.parametrize(
+    "name",
+    [
+        "a974dd6b39b56fc190659effa4fa25451f8751eb",
+        "96e863530",
+        "foo",
+        "a974dd6b39b56fc190659effa4fa2",
+        "yes this is dog",
+    ],
+)
+def test_resolve_object_name__not_found(repo, name):
     """Should raise an Exception if no results are found."""
 
     with pytest.raises(Exception) as excinfo:
-        services.resolve_object_name(repo, name="96e863530")
+        services.resolve_object_name(repo, name=name)
 
-    assert str(excinfo.value) == "No such object 96e863530"
+    assert str(excinfo.value) == f"No such object {name}"
 
 
 def test_resolve_object_name__ambiguous(repo):
@@ -276,33 +275,75 @@ def test_resolve_object_name__ambiguous(repo):
     )
 
 
-def test_find_object__no_results():
-    pass
+def test_find_object__head(repo):
+    """Should resolve the special 'HEAD' reference to the SHA-1 hash it points to."""
+
+    head_ref = repo.repo_file("refs/heads/master", touch=True)
+    head_ref.write_bytes(b"0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
+
+    sha = services.find_object(repo, name="HEAD")
+    assert sha == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
 
 
-def test_find_object__multiple_results():
-    pass
+@pytest.mark.parametrize(
+    "name",
+    [
+        "a974dd6b39b56fc190659effa4fa25451f8751eb",
+        "96e863530",
+        "foo",
+        "a974dd6b39b56fc190659effa4fa2",
+        "yes this is dog",
+    ],
+)
+def test_find_object__not_found(repo, name):
+    """Should return None if no matching object is found."""
+
+    with pytest.raises(Exception) as excinfo:
+        services.find_object(repo, name=name)
+
+    assert str(excinfo.value) == f"No such object {name}"
 
 
-def test_find_object__no_obj_type():
-    pass
+def test_find_object__blob(repo):
+    """Should return the blob object without following any references."""
+
+    blob = objects.Blob(repo, b"I'm a file")
+
+    # 73b8537f7efe30c711acfc878a71c0f4fb68af63
+    sha = services.write_object(repo, blob)
+
+    found = services.find_object(repo, sha, obj_type="blob")
+    assert found == "73b8537f7efe30c711acfc878a71c0f4fb68af63"
+
+    # Should also match the Blob given only its short name
+    found = services.find_object(repo, sha[0:7], obj_type="blob")
+    assert found == "73b8537f7efe30c711acfc878a71c0f4fb68af63"
 
 
-def test_find_object__dont_follow():
-    pass
+def test_find_object__dont_follow(repo, tag_message):
+    """Should return None if the requested object was not found immediately and follow = False."""
+
+    tag = objects.Tag(repo, tag_message)
+    sha = services.write_object(repo, tag)
+    found = services.find_object(repo, sha, obj_type="commit", follow=False)
+    assert not found
 
 
-def test_find_object__follow_tag():
-    pass
+def test_find_object__tag(repo, commit_message, tag_message):
+    """Should follow the Tag to find its referenced Commit."""
+
+    commit = objects.Commit(repo, commit_message)
+    commit_sha = services.write_object(repo, commit)
+
+    tag = objects.Tag(repo, tag_message)
+    tag.obj_sha = commit_sha
+    tag_sha = services.write_object(repo, tag)
+
+    found = services.find_object(repo, tag_sha, obj_type="commit")
+    assert found == commit_sha
 
 
-def test_find_object__follow_commit():
-    pass
+def test_find_object__tree():
+    """Should follow a Commit to find its referenced Tree."""
 
-
-def test_log_history():
-    pass
-
-
-def test_log_commit():
-    pass
+    # TODO: Implement after implementing the Tree model

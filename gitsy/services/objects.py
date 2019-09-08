@@ -119,12 +119,11 @@ def resolve_object_name(repo: Repository, name: str) -> str:
 
     name = name.strip().lower()
 
-    if name.upper() == "HEAD":
-        return resolve_ref(repo, "HEAD")
-
     if FULL_HASH_REGEX.match(name):
-        # We have a full SHA-1 hash already.
-        return name
+        # If the object exists, return the SHA-1 hash as-is.
+        obj_file = repo.repo_dir("objects") / name[0:2] / name[2:]
+        if obj_file.exists():
+            return name
 
     if SHORT_HASH_REGEX.match(name):
         # Search the 'objects' directory for files matching the name. We initially
@@ -156,6 +155,9 @@ def find_object(
 ) -> Optional[str]:
     """Find the Object with the given name. Returns None if no Object is found."""
 
+    if name.upper() == "HEAD":
+        return resolve_ref(repo, "HEAD")
+
     sha = resolve_object_name(repo, name)
 
     if not obj_type:
@@ -175,33 +177,15 @@ def find_object(
         if obj.type_ == "tag":
             tag = cast(objects.Tag, obj)
             sha = tag.obj_sha
+            continue
 
-        elif obj.type_ == "commit" and obj_type == "tree":
+        # Follow commit trees
+        if obj.type_ == "commit" and obj_type == "tree":
             commit = cast(objects.Commit, obj)
             sha = commit.tree_sha
-        else:
-            return None
+            continue
 
-
-def log_history(repo: Repository, commit_sha: str) -> None:
-    """Logs a history of Commits to the console, starting with the given commit SHA."""
-
-    full_sha = find_object(repo, commit_sha, obj_type="commit")
-    assert full_sha
-    commit = cast(objects.Commit, read_object(repo, full_sha, obj_type="commit"))
-    _log_commit(commit, commit_sha)
-
-
-def _log_commit(commit: objects.Commit, commit_sha: str) -> None:
-    """Logs a single Commit to the console."""
-
-    print(f"commit: {commit_sha}")
-
-    author = commit.author
-
-    print(f"Author: {author.name} <{author.email}>")
-    print(f"Date:   {author.authored_at}")
-    print(f"\n\t{commit.message}")
+        return None
 
 
 def _get_object_class(obj_type: str) -> Type[objects.Object]:
